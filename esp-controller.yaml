@@ -39,12 +39,12 @@ dashboard_import:
   import_full_config: false
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/${repo_user}/${repo_name}
-      ref: main
-      refresh: 1d
-    components: [fallback_engine]
+     - source:
+         type: git
+         url: https://github.com/${repo_user}/${repo_name}
+         ref: main
+       refresh: 1d
+       components: [fallback_engine]
 
 ethernet:
   type: LAN8720
