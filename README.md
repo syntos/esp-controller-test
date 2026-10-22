@@ -203,11 +203,11 @@ The controller adds a few configuration buttons to its device page in Home Assis
 If Home Assistant is down and you forgot the password, the fallback page can be reset with a push button, when enabled with
 `reset_input` in the configuration (input 48 in the default setup).
 
-1. Restart the controller.
-2. Within **60 seconds** of starting, press the button and **hold it for 10 seconds**.
+1. Restart the controller. Within **60 seconds** of starting, press the button and **hold it for 10 seconds**. The status LED blinks white while you hold.
+2. When the LED turns **steady green**, the password has been reset: release the button. The LED returns to its normal colour.
 3. Open `http://<controller-ip>/fallback` and choose a new password.
 
-Your stored rules are kept. Do not hold the button while the controller is starting, and use a **push button**, not a switch.
+Your stored rules are kept. Do not hold the button while the controller is starting (it is then ignored until you release and press again), and use a **push button**, not a switch.
 If you use this input as the reset button, do not use it in fallback rules (`"in": 47`).
 
 ---

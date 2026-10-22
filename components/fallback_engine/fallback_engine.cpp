@@ -24,9 +24,11 @@ static const size_t MAX_BODY = 32768;
 static const uint32_t DEBOUNCE_MS = 30;
 static const size_t PASS_MIN = 8, PASS_MAX = 64;
 
-// Physical reset: hold the reset input for at least RESET_HOLD_MS,
-// starting within RESET_WINDOW_MS after boot.
+// Physical reset: press the reset input within RESET_WINDOW_MS after boot and hold it for
+// RESET_HOLD_MS. The status LED blinks white while holding and turns steady green when the
+// password has been reset (release now).
 static const uint32_t RESET_WINDOW_MS = 60000;
+static const uint32_t BOOT_SETTLE_MS = 5000;  // initial input states are reported within this time
 static const uint32_t RESET_HOLD_MS = 10000;
 
 static const char *const SETUP_PAGE = R"HTML(<!doctype html><meta charset=utf-8>
@@ -138,17 +140,31 @@ void FallbackEngine::add_input(binary_sensor::BinarySensor *sensor) {
 
 void FallbackEngine::set_reset_input(binary_sensor::BinarySensor *sensor) {
   sensor->add_on_state_callback([this](bool state) {
-    // The first callback is the initial state after boot: ignore it.
-    // Only a real press (rising edge) within the time window counts.
+    // A button that is already held down while the controller boots does not count:
+    // the first state reported right after boot is ignored if it is "pressed".
     if (!this->reset_seen_first_) {
       this->reset_seen_first_ = true;
+      if (state && millis() < BOOT_SETTLE_MS) {
+        ESP_LOGD(TAG, "Reset input held at boot (ignored until released)");
+        return;
+      }
+    }
+    if (state && millis() >= RESET_WINDOW_MS) {
+      ESP_LOGI(TAG, "Reset input pressed after the %u s window: ignored (restart the controller to try again)",
+               (unsigned) (RESET_WINDOW_MS / 1000));
       return;
     }
-    if (state && millis() < RESET_WINDOW_MS) {
+    if (state) {
+      ESP_LOGI(TAG, "Reset input pressed: keep holding for %u s", (unsigned) (RESET_HOLD_MS / 1000));
       this->reset_pressing_ = true;
+      this->reset_done_ = false;
       this->reset_press_start_ = millis();
+      this->reset_blink_ = 0;
     } else {
+      if (this->reset_pressing_) ESP_LOGI(TAG, "Reset input released");
       this->reset_pressing_ = false;
+      this->reset_done_ = false;
+      this->reset_led_restore_();
     }
   });
 }
@@ -505,6 +521,33 @@ esp_err_t FallbackEngine::on_status_(httpd_req_t *req) {
   return send_(req, "200 OK", "application/json", buf);
 }
 
+// ---------------------------------------------------------------- reset LED feedback
+
+void FallbackEngine::reset_led_feedback_(bool on, float r, float g, float b) {
+  if (this->status_light_ == nullptr) return;
+  if (!this->led_saved_) {
+    this->saved_led_ = this->status_light_->remote_values;
+    this->led_saved_ = true;
+  }
+  auto call = this->status_light_->make_call();
+  call.set_state(on);
+  if (on) {
+    call.set_rgb(r, g, b);
+    call.set_brightness(1.0f);
+  }
+  call.set_transition_length(0);
+  call.perform();
+}
+
+void FallbackEngine::reset_led_restore_() {
+  if (this->status_light_ == nullptr || !this->led_saved_) return;
+  this->led_saved_ = false;
+  auto call = this->status_light_->make_call();
+  call.from_light_color_values(this->saved_led_);
+  call.set_transition_length(0);
+  call.perform();
+}
+
 // ---------------------------------------------------------------- runtime
 
 void FallbackEngine::loop() {
@@ -513,9 +556,17 @@ void FallbackEngine::loop() {
     this->start_server_();
   }
 
-  if (this->reset_pressing_ && millis() - this->reset_press_start_ >= RESET_HOLD_MS) {
-    this->reset_pressing_ = false;
-    this->reset_password();
+  if (this->reset_pressing_) {
+    uint32_t now = millis();
+    if (!this->reset_done_ && now - this->reset_press_start_ >= RESET_HOLD_MS) {
+      this->reset_done_ = true;
+      this->reset_password();
+      this->reset_led_feedback_(true, 0.0f, 1.0f, 0.0f);  // steady green: you can release now
+    } else if (!this->reset_done_ && now - this->reset_blink_ >= 250) {
+      this->reset_blink_ = now;
+      this->reset_blink_on_ = !this->reset_blink_on_;
+      this->reset_led_feedback_(this->reset_blink_on_, 1.0f, 1.0f, 1.0f);  // blinking white
+    }
   }
 
   this->update_mode_();

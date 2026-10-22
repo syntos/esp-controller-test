@@ -43,7 +43,7 @@ external_components:
       type: git
       url: https://github.com/${repo_user}/${repo_name}
       ref: main
-    refresh: always
+    refresh: 1d
     components: [fallback_engine]
 
 ethernet:
@@ -1021,10 +1021,13 @@ fallback_engine:
   disconnect_delay: 15s
   reconnect_delay: 10s
   # Optional: a PUSH-BUTTON input to reset the fallback page password without Home
-  # Assistant. Press it within 60 s after power-up and hold for 10 s. The first
-  # state seen after boot is ignored, so a button that is already held down at
-  # power-up does not trigger it. Pick a push button, not a wall switch.
-  # reset_input: ${prefix}_INPUT_48
+  # Assistant. Press it within 60 s after power-up and hold it for 10 s. The status LED blinks white while you
+  # hold and turns steady green when the password is reset: release the button then.
+  # A button that is already held down
+  # at power-up is ignored. Pick a push button, not a wall switch, and do not
+  # use this input in fallback rules.
+  reset_input: ${prefix}_INPUT_48
+  status_light: statusled
   inputs:
     - ${prefix}_INPUT_01
     - ${prefix}_INPUT_02
