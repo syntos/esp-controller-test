@@ -254,7 +254,7 @@ connect the cable, flash with [ESPHome Web](https://web.esphome.io/) (Chrome or 
 │   └── fallback_engine/           The fallback engine (ESPHome external component)
 ├── example/
 │   └── klant-config.yaml          Example configuration with your own secrets
-├── fallback-voorbeeld.json        Small fallback example
+├── fallback-example.json          Small fallback example
 ├── fallback-test.json             Fallback example that covers every trigger and action
 ├── secrets.yaml.example           Template for your own secrets file
 └── assets/
