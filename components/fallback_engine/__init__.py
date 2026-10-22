@@ -16,6 +16,7 @@ CONF_INPUTS = "inputs"
 CONF_OUTPUTS = "outputs"
 CONF_DISCONNECT_DELAY = "disconnect_delay"
 CONF_RECONNECT_DELAY = "reconnect_delay"
+CONF_BOOT_LED_DELAY = "boot_led_delay"
 CONF_RESET_INPUT = "reset_input"
 CONF_STATUS_LIGHT = "status_light"
 CONF_EDITOR_URL = "editor_url"
@@ -44,6 +45,8 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_DISCONNECT_DELAY, default="15s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_RECONNECT_DELAY, default="10s"): cv.positive_time_period_milliseconds,
+        # After power-up the status LED stays red this long, even when the fallback is already active
+        cv.Optional(CONF_BOOT_LED_DELAY, default="60s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_PORT, default=80): cv.port,
         # Optional: a push-button input the customer can use to reset the password
         cv.Optional(CONF_RESET_INPUT): cv.use_id(binary_sensor.BinarySensor),
@@ -79,6 +82,7 @@ async def to_code(config):
 
     cg.add(var.set_disconnect_delay(config[CONF_DISCONNECT_DELAY]))
     cg.add(var.set_reconnect_delay(config[CONF_RECONNECT_DELAY]))
+    cg.add(var.set_boot_led_delay(config[CONF_BOOT_LED_DELAY]))
     cg.add(var.set_port(config[CONF_PORT]))
 
     # ESPHome excludes unused ESP-IDF components; we need the HTTP server.

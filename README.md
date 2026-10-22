@@ -121,7 +121,7 @@ You now have these entities:
 | Home Assistant is gone for **15 seconds** | The controller switches to **fallback mode** and starts applying your saved rules. |
 | Home Assistant is back for **10 seconds** | The controller returns to **normal mode**. Home Assistant takes over again. |
 
-This also applies after a power cut or restart while Home Assistant is not yet available.
+This also applies after a power cut or restart while Home Assistant is not yet available: the fallback starts after 15 seconds. The status LED stays red for the first 60 seconds after power-up and then turns orange if Home Assistant is still not connected.
 The rules are stored in the controller's own non-volatile memory, so they survive restarts.
 
 ### Set up the fallback page
@@ -214,10 +214,10 @@ Adapt the numbers to the inputs and outputs you actually wired.
 
 | Colour | Meaning |
 |---|---|
-| 🔴 Red | Starting up, or no connection to Home Assistant since power-up |
+| 🔴 Red | Starting up: no connection to Home Assistant yet since power-up (for at most 60 seconds; the fallback may already be active) |
 | 🔵 Blue | Connected to Home Assistant |
 | 🟣 Purple | Connection to Home Assistant lost (less than 15 seconds ago) |
-| 🟠 Orange | Home Assistant has been gone for 15 seconds: **fallback mode is active** |
+| 🟠 Orange | Home Assistant has been gone for 15 seconds (and at least 60 seconds after power-up): **fallback mode is active** |
 
 Only Home Assistant counts for the LED and for the fallback. Other connections to the controller, such as the log viewer in ESPHome Builder, do not change the colour.
 

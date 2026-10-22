@@ -42,4 +42,4 @@ jobs:
         uses: esphome/build-action@v6
         with:
           yaml-file: build/esp-controller-${{ matrix.variant }}.yaml
-          esphome-version: ${{ steps.cfg.outputs.esphome }}
+          version: ${{ steps.cfg.outputs.esphome }}

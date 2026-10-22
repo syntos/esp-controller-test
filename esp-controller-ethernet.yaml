@@ -1,11 +1,11 @@
 # GENERATED FILE - do not edit by hand.
 # Source: src/common.yaml + src/network-ethernet.yaml. Rebuild with: python tools/build_yaml.py
 #
-# Logi.casa ESP Home Controller, ethernet variant, version 1.1.0.
+# Logi.casa ESP Home Controller, ethernet variant, version 1.1.2.
 # Contains no private secrets. Your own API key is created when you take control in ESPHome Builder.
 
 substitutions:
-  project_version: "1.1.0"
+  project_version: "1.1.2"
   factory_api_key: "hLGjhf96voA4hxDAVuzz8/9QTL8kgiMh+las8DLf5L8="
   editor_url: "https://syntos.github.io/esp-controller-test/"
   device_name: logicasa
@@ -1003,6 +1003,9 @@ fallback_engine:
   id: fallback
   disconnect_delay: 15s
   reconnect_delay: 10s
+  # After power-up the status LED stays red for this long when Home Assistant is not
+  # connected, then turns orange. The fallback itself starts after disconnect_delay.
+  boot_led_delay: 60s
   # Optional: a PUSH-BUTTON input to reset the fallback page password without Home
   # Assistant. Press it within 60 s after power-up and hold it for 10 s. The status
   # LED blinks white while you hold and turns steady green when the password has been

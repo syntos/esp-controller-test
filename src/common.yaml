@@ -966,6 +966,9 @@ fallback_engine:
   id: fallback
   disconnect_delay: 15s
   reconnect_delay: 10s
+  # After power-up the status LED stays red for this long when Home Assistant is not
+  # connected, then turns orange. The fallback itself starts after disconnect_delay.
+  boot_led_delay: 60s
   # Optional: a PUSH-BUTTON input to reset the fallback page password without Home
   # Assistant. Press it within 60 s after power-up and hold it for 10 s. The status
   # LED blinks white while you hold and turns steady green when the password has been

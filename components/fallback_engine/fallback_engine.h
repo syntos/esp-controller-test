@@ -39,6 +39,7 @@ class FallbackEngine : public Component {
   void set_status_light(light::LightState *light) { this->status_light_ = light; }
   void set_disconnect_delay(uint32_t ms) { this->disconnect_delay_ = ms; }
   void set_reconnect_delay(uint32_t ms) { this->reconnect_delay_ = ms; }
+  void set_boot_led_delay(uint32_t ms) { this->boot_led_delay_ = ms; }
   void set_port(uint16_t port) { this->port_ = port; }
   void set_editor_url(const std::string &url) { this->editor_url_ = url; }
 
@@ -123,6 +124,7 @@ class FallbackEngine : public Component {
 
   uint32_t disconnect_delay_{15000};
   uint32_t reconnect_delay_{10000};
+  uint32_t boot_led_delay_{60000};
   bool active_{false};
   bool last_ha_up_{false};
   uint32_t last_change_{0};

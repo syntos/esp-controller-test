@@ -150,8 +150,8 @@ void FallbackEngine::dump_config() {
   ESP_LOGCONFIG(TAG, "  Inputs: %u, outputs: %u", (unsigned) this->inputs_.size(), (unsigned) this->outputs_.size());
   ESP_LOGCONFIG(TAG, "  Rules in NVS: %u", (unsigned) this->rules_.size());
   ESP_LOGCONFIG(TAG, "  Port: %u, password: %s", this->port_, this->pass_.empty() ? "NOT SET (setup pending)" : "set");
-  ESP_LOGCONFIG(TAG, "  Disconnect delay: %ums, reconnect delay: %ums", (unsigned) this->disconnect_delay_,
-                (unsigned) this->reconnect_delay_);
+  ESP_LOGCONFIG(TAG, "  Disconnect delay: %ums, reconnect delay: %ums, boot LED delay: %ums", (unsigned) this->disconnect_delay_,
+                (unsigned) this->reconnect_delay_, (unsigned) this->boot_led_delay_);
 }
 
 // ---------------------------------------------------------------- NVS
@@ -568,7 +568,7 @@ void FallbackEngine::update_led_(bool ha_up) {
   if (ha_up) this->seen_ha_ = true;
   int want;
   if (ha_up) want = 0;                  // blue
-  else if (this->active_) want = 1;     // orange: fallback mode
+  else if (this->active_ && (this->seen_ha_ || millis() >= this->boot_led_delay_)) want = 1;  // orange: fallback mode
   else if (this->seen_ha_) want = 2;    // purple: connection lost, waiting
   else want = 3;                        // red: not connected since power-up
   if (want == this->led_applied_) return;
@@ -614,10 +614,12 @@ void FallbackEngine::update_mode_() {
     this->last_ha_up_ = ha_up;
     this->last_change_ = now;
   }
+  if (ha_up) this->seen_ha_ = true;
   uint32_t stable = now - this->last_change_;
   if (!this->active_ && !ha_up && stable >= this->disconnect_delay_) {
     this->active_ = true;
-    ESP_LOGW(TAG, "Home Assistant gone -> FALLBACK active (%u rules)", (unsigned) this->rules_.size());
+    ESP_LOGW(TAG, "Home Assistant %s -> FALLBACK active (%u rules)", this->seen_ha_ ? "gone" : "not connected since boot",
+             (unsigned) this->rules_.size());
   } else if (this->active_ && ha_up && stable >= this->reconnect_delay_) {
     this->active_ = false;
     {
