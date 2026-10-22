@@ -223,6 +223,38 @@ dialog::backdrop{background:rgba(6,26,32,.6)}
 .toast button{border:0;background:none;color:var(--blue);font-weight:700;cursor:pointer;padding:4px 6px}
 .drop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(78,195,224,.88);color:#04222B;font-size:1.6rem;font-weight:700;text-align:center;padding:20px}
 
+
+/* rule groups */
+.rule-top{gap:10px}
+.rule-name{flex:1;min-width:0;border:0;border-bottom:1.5px dashed var(--line);background:transparent;padding:6px 4px;font-weight:700;font-size:1.05rem;border-radius:0}
+.rule-name:hover{border-bottom-color:var(--blue)}
+.rule-name::placeholder{color:var(--ink-2);opacity:.55;font-weight:500}
+.rule-name:focus-visible{border-radius:6px}
+.expands{color:var(--ink-2);font-size:.85rem;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:3px 4px 3px 11px;font-size:.93rem}
+.chip small{color:var(--ink-2);max-width:13ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{width:24px;height:24px;display:grid;place-items:center;border:0;background:none;border-radius:50%;cursor:pointer;color:var(--ink-2)}
+.chip button .ic{width:.95em;height:.95em}
+.chip button:hover{background:var(--bg);color:var(--ink)}
+.chip.more{padding:5px 11px;cursor:pointer;font-weight:700}
+.in .chip{border-color:var(--blue)}
+.out .chip{border-color:var(--green)}
+.chip-add{min-height:34px}
+#picker{width:min(900px,calc(100vw - 24px))}
+.blk{margin-bottom:16px}
+.blk-h{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.blk-h h3{font-size:1.05rem}
+.blk-r{color:var(--ink-2);font-size:.9rem;margin-right:auto}
+#picker .tiles{grid-template-columns:repeat(8,minmax(0,1fr))}
+#picker .tile{min-height:58px}
+@media(max-width:600px){#picker .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.pick-foot{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--line);background:var(--surface)}
+.pick-foot .sc{margin-right:auto;font-weight:600}
+.name-blk{margin-bottom:14px}
+.name-blk h4{margin:0 0 8px;font-size:.98rem}
+.name-blk h4 span{color:var(--ink-2);font-weight:400;font-size:.88rem;margin-left:6px}
+
 /* footer */
 .foot{margin-top:46px;padding:26px 0 40px;border-top:1px solid var(--line);color:var(--ink-2);font-size:.92rem}
 .foot .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px}
@@ -395,7 +427,8 @@ dialog::backdrop{background:rgba(6,26,32,.6)}
 <dialog id="picker" aria-labelledby="pickerTitle">
   <div class="dlg-head"><h2 id="pickerTitle"></h2><button class="icon-btn" type="button" data-close data-i18n-title="close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <p class="dlg-sub" id="pickerSub"></p>
-  <div class="dlg-body"><div class="tiles" id="pickerGrid"></div></div>
+  <div class="dlg-body"><div id="pickerGrid"></div></div>
+  <div class="pick-foot"><span class="sc" id="pickCount"></span><button class="btn small" id="pickClear" type="button" data-i18n="sel.clear"></button><button class="btn primary" type="button" data-close data-i18n="done"></button></div>
 </dialog>
 
 <dialog id="dlDialog" aria-labelledby="dlTitle">
@@ -427,9 +460,88 @@ dialog::backdrop{background:rgba(6,26,32,.6)}
 const Core = (function () {
   const TRIGGERS = ['both', 'rising', 'falling'];
   const ACTIONS = ['toggle', 'on', 'off', 'on_for', 'off_for'];
-  const LIMITS = { inputs: 48, outputs: 32, rules: 256, maxSeconds: 65535, maxBytes: 32768, labelLen: 40 };
+  const LIMITS = { inputs: 48, outputs: 32, block: 16, rules: 256, maxSeconds: 65535, maxBytes: 32768, metaBytes: 15000, labelLen: 40, nameLen: 60 };
   const isTimer = (a) => a === 'on_for' || a === 'off_for';
   const validSeconds = (s) => Number.isInteger(s) && s >= 1 && s <= LIMITS.maxSeconds;
+  const uniqSorted = (arr) => [...new Set(arr)].sort((a, b) => a - b);
+  const bytesOf = (s) => new TextEncoder().encode(s).length;
+
+  /* A "rule" in the editor (group) = several inputs, one trigger, several outputs, one action.
+     The controller only knows flat rules (one input -> one output), so a group expands to
+     every input x output pair. */
+  function expand(groups) {
+    const out = [];
+    for (const g of groups) {
+      for (const i of g.ins) {
+        for (const o of g.outs) {
+          out.push({ in: i, trigger: g.trigger, out: o, action: g.action, seconds: isTimer(g.action) ? g.seconds : null });
+        }
+      }
+    }
+    return out;
+  }
+
+  function parseRule(r) {
+    if (!r || typeof r !== 'object') return null;
+    if (!Number.isInteger(r.in) || r.in < 0 || r.in >= LIMITS.inputs) return null;
+    if (!Number.isInteger(r.out) || r.out < 0 || r.out >= LIMITS.outputs) return null;
+    if (!TRIGGERS.includes(r.trigger) || !ACTIONS.includes(r.action)) return null;
+    let seconds = null;
+    if (isTimer(r.action)) {
+      if (!validSeconds(r.seconds)) return null;
+      seconds = r.seconds;
+    }
+    return { in: r.in, trigger: r.trigger, out: r.out, action: r.action, seconds };
+  }
+
+  // Old files and hand-written files have no groups: merge neighbouring rules that
+  // only differ in their output, so "one button switches four lights off" is one rule again.
+  function fromFlat(rules) {
+    const groups = [];
+    for (const r of rules) {
+      const last = groups[groups.length - 1];
+      if (last && last.ins.length === 1 && last.ins[0] === r.in && last.trigger === r.trigger &&
+          last.action === r.action && (last.seconds || 0) === (r.seconds || 0) && !last.outs.includes(r.out)) {
+        last.outs.push(r.out);
+      } else {
+        groups.push({ name: '', ins: [r.in], trigger: r.trigger, outs: [r.out], action: r.action, seconds: r.seconds });
+      }
+    }
+    groups.forEach((g) => { g.outs = uniqSorted(g.outs); });
+    return groups;
+  }
+
+  function parseNumList(v, max) {
+    if (!Array.isArray(v) || !v.length) return null;
+    if (!v.every((n) => Number.isInteger(n) && n >= 0 && n < max)) return null;
+    return uniqSorted(v);
+  }
+
+  function parseGroups(list) {
+    if (!Array.isArray(list)) return null;
+    const groups = [];
+    for (const g of list) {
+      if (!g || typeof g !== 'object') return null;
+      const ins = parseNumList(g.in, LIMITS.inputs);
+      const outs = parseNumList(g.out, LIMITS.outputs);
+      if (!ins || !outs || !TRIGGERS.includes(g.trigger) || !ACTIONS.includes(g.action)) return null;
+      let seconds = null;
+      if (isTimer(g.action)) {
+        if (!validSeconds(g.seconds)) return null;
+        seconds = g.seconds;
+      }
+      const name = typeof g.name === 'string' ? g.name.trim().slice(0, LIMITS.nameLen) : '';
+      groups.push({ name, ins, trigger: g.trigger, outs, action: g.action, seconds });
+    }
+    return groups;
+  }
+
+  const sig = (r) => `${r.in}|${r.trigger}|${r.out}|${r.action}|${r.seconds || 0}`;
+  const sameRules = (a, b) => {
+    if (a.length !== b.length) return false;
+    const x = a.map(sig).sort(), y = b.map(sig).sort();
+    return x.every((v, i) => v === y[i]);
+  };
 
   function parseFile(text) {
     let data;
@@ -438,16 +550,8 @@ const Core = (function () {
     const rules = [];
     let skipped = 0;
     for (const r of data.rules) {
-      if (!r || typeof r !== 'object') { skipped++; continue; }
-      if (!Number.isInteger(r.in) || r.in < 0 || r.in >= LIMITS.inputs) { skipped++; continue; }
-      if (!Number.isInteger(r.out) || r.out < 0 || r.out >= LIMITS.outputs) { skipped++; continue; }
-      if (!TRIGGERS.includes(r.trigger) || !ACTIONS.includes(r.action)) { skipped++; continue; }
-      let seconds = null;
-      if (isTimer(r.action)) {
-        if (!validSeconds(r.seconds)) { skipped++; continue; }
-        seconds = r.seconds;
-      }
-      rules.push({ in: r.in, trigger: r.trigger, out: r.out, action: r.action, seconds });
+      const p = parseRule(r);
+      if (p) rules.push(p); else skipped++;
     }
     const labels = { in: {}, out: {} };
     if (data.labels && typeof data.labels === 'object' && !Array.isArray(data.labels)) {
@@ -463,12 +567,25 @@ const Core = (function () {
         }
       }
     }
-    return { rules, labels, skipped };
+    // Use the saved rule layout only when it still matches the flat rules exactly.
+    let groups = null, restored = false;
+    const saved = parseGroups(data.groups);
+    if (saved && skipped === 0 && sameRules(expand(saved), rules)) { groups = saved; restored = true; }
+    if (!groups) groups = fromFlat(rules);
+    return { groups, labels, skipped, restored };
   }
 
   function ruleLine(r) {
     let s = `{ "in": ${r.in}, "trigger": "${r.trigger}", "out": ${r.out}, "action": "${r.action}"`;
     if (isTimer(r.action)) s += `, "seconds": ${r.seconds}`;
+    return s + ' }';
+  }
+
+  function groupLine(g) {
+    let s = '{ ';
+    if (g.name) s += `"name": ${JSON.stringify(g.name)}, `;
+    s += `"in": [${g.ins.join(', ')}], "trigger": "${g.trigger}", "out": [${g.outs.join(', ')}], "action": "${g.action}"`;
+    if (isTimer(g.action)) s += `, "seconds": ${g.seconds}`;
     return s + ' }';
   }
 
@@ -478,32 +595,50 @@ const Core = (function () {
     return '{\n' + keys.map((i) => `      ${JSON.stringify(String(i))}: ${JSON.stringify(map[i])}`).join(',\n') + '\n    }';
   }
 
-  function serialize(rules, labels, withLabels) {
+  function serialize(groups, labels, withMeta) {
+    const flat = expand(groups);
     let s = '{\n  "version": 1,\n  "rules": [';
-    if (rules.length) s += '\n' + rules.map((r) => '    ' + ruleLine(r)).join(',\n') + '\n  ';
+    if (flat.length) s += '\n' + flat.map((r) => '    ' + ruleLine(r)).join(',\n') + '\n  ';
     s += ']';
-    if (withLabels && (Object.keys(labels.in).length || Object.keys(labels.out).length)) {
-      s += ',\n  "labels": {\n    "in": ' + labelBlock(labels.in) + ',\n    "out": ' + labelBlock(labels.out) + '\n  }';
+    if (withMeta) {
+      if (groups.length) s += ',\n  "groups": [\n' + groups.map((g) => '    ' + groupLine(g)).join(',\n') + '\n  ]';
+      if (Object.keys(labels.in).length || Object.keys(labels.out).length) {
+        s += ',\n  "labels": {\n    "in": ' + labelBlock(labels.in) + ',\n    "out": ' + labelBlock(labels.out) + '\n  }';
+      }
     }
     return s + '\n}\n';
   }
 
-  function validate(rules, bytes) {
+  // Size of what the controller stores next to the rules (names + layout).
+  function metaBytes(groups, labels) {
+    const o = {};
+    if (groups.length) o.groups = groups.map((g) => ({ name: g.name || undefined, in: g.ins, trigger: g.trigger, out: g.outs, action: g.action, seconds: isTimer(g.action) ? g.seconds : undefined }));
+    o.labels = labels;
+    return bytesOf(JSON.stringify(o));
+  }
+
+  function validate(groups, bytes, meta, withMeta) {
     const issues = [];
-    rules.forEach((r, i) => {
-      if (isTimer(r.action) && !validSeconds(r.seconds)) issues.push({ level: 'error', code: 'seconds', uid: r.uid, n: i + 1 });
+    groups.forEach((g, i) => {
+      if (!g.ins.length) issues.push({ level: 'error', code: 'noIn', uid: g.uid, n: i + 1 });
+      if (!g.outs.length) issues.push({ level: 'error', code: 'noOut', uid: g.uid, n: i + 1 });
+      if (isTimer(g.action) && !validSeconds(g.seconds)) issues.push({ level: 'error', code: 'seconds', uid: g.uid, n: i + 1 });
     });
-    if (rules.length > LIMITS.rules) issues.push({ level: 'error', code: 'tooMany', n: rules.length, max: LIMITS.rules });
+    const count = expand(groups).length;
+    if (count > LIMITS.rules) issues.push({ level: 'error', code: 'tooMany', n: count, max: LIMITS.rules });
     if (bytes > LIMITS.maxBytes) issues.push({ level: 'error', code: 'tooBig', kb: (bytes / 1024).toFixed(1) });
-    for (let i = 0; i < rules.length; i++) {
-      for (let j = i + 1; j < rules.length; j++) {
-        const a = rules[i], b = rules[j];
-        if (a.in !== b.in || a.out !== b.out) continue;
+    if (withMeta && meta > LIMITS.metaBytes) issues.push({ level: 'warn', code: 'metaBig' });
+    for (let i = 0; i < groups.length; i++) {
+      for (let j = i + 1; j < groups.length; j++) {
+        const a = groups[i], b = groups[j];
+        const sharedIn = a.ins.filter((x) => b.ins.includes(x));
+        const sharedOut = a.outs.filter((x) => b.outs.includes(x));
+        if (!sharedIn.length || !sharedOut.length) continue;
         const same = a.trigger === b.trigger && a.action === b.action && (a.seconds || 0) === (b.seconds || 0);
         if (same) {
           issues.push({ level: 'warn', code: 'dup', uid: b.uid, a: i + 1, b: j + 1 });
         } else if (a.trigger === b.trigger || a.trigger === 'both' || b.trigger === 'both') {
-          issues.push({ level: 'warn', code: 'overlap', uid: b.uid, a: i + 1, b: j + 1, in: a.in + 1, out: a.out + 1 });
+          issues.push({ level: 'warn', code: 'overlap', uid: b.uid, a: i + 1, b: j + 1, in: sharedIn[0] + 1, out: sharedOut[0] + 1 });
         }
       }
     }
@@ -549,7 +684,7 @@ const Core = (function () {
     }
   }
 
-  return { TRIGGERS, ACTIONS, LIMITS, isTimer, validSeconds, parseFile, serialize, validate, Sim };
+  return { TRIGGERS, ACTIONS, LIMITS, isTimer, validSeconds, expand, fromFlat, parseFile, serialize, metaBytes, validate, Sim };
 })();
 //</core>
 </script>
@@ -562,16 +697,20 @@ const Core = (function () {
 const I18N = {
   en: {
     'app.title': 'Fallback editor',
-    'app.tag': 'Build the rules your controller follows when Home Assistant is away. Every rule connects one input to one output.',
+    'app.tag': 'Build the rules your controller follows when Home Assistant is away. A rule connects one or more inputs to one or more outputs.',
     'step.1': 'Build your rules', 'step.2': 'Download the file', 'step.3': 'Upload it to your controller',
     'btn.open': 'Open file', 'btn.new': 'New', 'btn.download': 'Download',
     'tab.rules': 'Rules', 'tab.test': 'Test', 'tab.names': 'Names', 'tab.file': 'File',
     'add.rule': 'Add rule', 'presets': 'Quick add', 'search.ph': 'Search by number or name',
     'sort': 'Sort by input', 'undo': 'Undo', 'redo': 'Redo', 'close': 'Close',
     'preset.switch': 'Wall switch toggles a light', 'preset.push': 'Push button toggles a light',
+    'preset.twoin': 'One light, several switches',
     'preset.hold': 'Light is on while the button is held', 'preset.timer': 'Light on for a set time',
-    'preset.alloff': 'One button switches three lights off',
-    'rule': 'Rule', 'when': 'When', 'then': 'Then', 'input': 'Input', 'output': 'Output',
+    'preset.alloff': 'One button switches several lights off',
+    'rule': 'Rule', 'rule.name.ph': 'Name this rule (optional)', 'when': 'When', 'then': 'Then',
+    'input': 'Input', 'output': 'Output',
+    'in.choose': 'Choose inputs', 'in.change': 'Add or remove', 'out.choose': 'Choose outputs', 'out.change': 'Add or remove',
+    'remove': 'Remove', 'multi.in': 'Any of these inputs triggers the rule.', 'multi.out': 'Every one of these outputs gets the action.',
     'trigger.both': 'Switch changes', 'trigger.rising': 'Button pressed', 'trigger.falling': 'Button released',
     'hint.both': 'Reacts to every change, on and off. Made for wall switches.',
     'hint.rising': 'Reacts when the input becomes active. Made for push buttons.',
@@ -583,29 +722,36 @@ const I18N = {
     'ahint.off_for': 'Switches off, then on again after this time. Triggering again restarts the time.',
     'time': 'Time', 'unit': 'Unit', 'unit.s': 'seconds', 'unit.min': 'minutes', 'unit.h': 'hours',
     'dup': 'Duplicate', 'del': 'Delete', 'deleted': 'Rule deleted.', 'undo.do': 'Undo',
-    'count': '{n} of {max} rules',
+    'expands': '{n} in file',
+    'count': '{n} rules, {f} of {max} file entries',
     'checks.ok': 'No problems found.', 'checks.err': '{n} to fix before you can download', 'checks.warn': '{n} to look at',
+    'issue.noIn': 'Rule {n}: choose at least one input.',
+    'issue.noOut': 'Rule {n}: choose at least one output.',
     'issue.seconds': 'Rule {n}: set a time between 1 second and 18 hours.',
-    'issue.tooMany': 'A controller stores at most {max} rules. You have {n}.',
+    'issue.tooMany': 'A controller stores at most {max} file entries (every input and output pair counts as one). You have {n}.',
     'issue.tooBig': 'The file is {kb} KB and the controller accepts at most 32 KB. Remove rules or leave out the names.',
+    'issue.metaBig': 'The names and rule layout are too large for the controller to keep. The rules still work, but names will be missing when you download from the controller.',
     'issue.dup': 'Rules {a} and {b} are identical.',
     'issue.overlap': 'Rules {a} and {b} both react to input {in} and control output {out}. They run one after the other.',
     'empty.title': 'No rules yet', 'empty.text': 'Add your first rule, or open a file you made earlier.',
     'empty.add': 'Add first rule', 'empty.example': 'Try an example',
-    'pick.input': 'Choose an input', 'pick.output': 'Choose an output',
-    'pick.sub': 'Input 1 is INPUT_01 on the controller.', 'pick.subOut': 'Output 1 is CHANNEL_01 on the controller.',
-    'used': 'used in {n} rules',
+    'pick.inputs': 'Choose inputs', 'pick.outputs': 'Choose outputs',
+    'pick.sub.in': 'Tap to select. Inputs come in blocks of 16, like on the controller.',
+    'pick.sub.out': 'Tap to select. Outputs come in blocks of 16, like on the controller.',
+    'block': 'Block {n}', 'range.in': 'Inputs {a} to {b}', 'range.out': 'Outputs {a} to {b}',
+    'sel.block': 'Select block', 'sel.none': 'Clear block', 'sel.clear': 'Clear all', 'sel.count': '{n} selected', 'done': 'Done',
+    'used': 'used in {n} other rules',
     'test.title': 'Try your rules', 'test.intro': 'Press the blue inputs and watch the green outputs, the way the controller reacts while Home Assistant is away.',
     'test.reset': 'Reset test', 'test.empty': 'Add rules first, then test them here.',
-    'test.inputs': 'Inputs', 'test.outputs': 'Outputs', 'test.push': 'Push button: hold to press', 'test.switch': 'Switch: click to flip',
-    'test.mode': 'Behaves like a switch', 'test.on': 'On', 'test.off': 'Off', 'test.left': '{s} s left',
+    'test.inputs': 'Inputs', 'test.outputs': 'Outputs',
+    'test.mode': 'Behaves like a switch', 'test.left': '{s} s left',
     'test.note': 'Outputs start switched off. The test follows the same rules as the controller, but timing can differ by a fraction of a second.',
     'names.title': 'Names', 'names.intro': 'Give your inputs and outputs a name, such as “Hallway switch”. The names show up in your rules.',
     'names.inputs': 'Inputs', 'names.outputs': 'Outputs', 'names.ph': 'Name', 'names.clear': 'Clear all names',
     'file.title': 'Your fallback file', 'file.intro': 'This is the file you upload to the controller. You can also open it later to change it.',
-    'file.name': 'File name', 'file.labels': 'Save the names in the file', 'file.copy': 'Copy',
-    'file.copied': 'Copied.', 'file.meta': '{n} rules, {kb} KB',
-    'file.labelsHint': 'The controller ignores names.',
+    'file.name': 'File name', 'file.labels': 'Save names and rule layout in the file', 'file.copy': 'Copy',
+    'file.copied': 'Copied.', 'file.meta': '{n} rules, {f} file entries, {kb} KB',
+    'file.labelsHint': 'The controller stores them with the rules, so you can download and edit them later.',
     'dl.title': 'Your file is ready', 'dl.saved': 'Saved as {name}. Now put it on your controller:',
     'dl.s1': 'Enter the IP address of your controller (you can find it in Home Assistant).',
     'dl.open': 'Open controller page',
@@ -613,7 +759,8 @@ const I18N = {
     'dl.s3': 'Choose the file and press Upload.',
     'dl.note': 'This editor only opens the page of your controller. Your file stays on your computer until you upload it there.',
     'dl.done': 'Done',
-    'opened': 'Opened {name}: {n} rules.', 'skipped': '{k} rules could not be read and were skipped.',
+    'opened': 'Opened {name}: {n} rules.', 'skipped': '{k} entries could not be read and were skipped.',
+    'regrouped': 'The saved layout did not match the rules, so rules were grouped automatically.',
     'err.json': 'This file is not valid JSON.', 'err.format': 'This does not look like a fallback file.',
     'err.empty': 'Add a rule first.', 'err.fix': 'Fix the problems first.',
     'new.done': 'Started a new, empty file.', 'sorted': 'Sorted by input.',
@@ -622,21 +769,26 @@ const I18N = {
     'leave': 'You have changes that are not downloaded yet.',
     'foot.text': 'Made for the Logi.casa ESP Home Controller.',
     'foot.product': 'Product page', 'foot.quick': 'Quick start', 'foot.support': 'Support',
-    'example.labelsIn': ['Wall switch', 'Push button', 'Hold button', 'Timer button', 'Pause button', 'All off', 'Release button'],
-    'example.labelsOut': ['Light 1', 'Light 2', 'Light 3', 'Light 4', 'Light 5']
+    'example.groups': ['Hallway light', 'Kitchen light (2 switches)', 'Light on while held', 'Light off when released', 'Timer light', 'Pause light', 'All lights off'],
+    'example.labelsIn': { 0: 'Hallway switch', 1: 'Kitchen switch', 2: 'Hold button', 3: 'Timer button', 4: 'Pause button', 5: 'All-off button', 7: 'Kitchen switch 2' },
+    'example.labelsOut': { 0: 'Hallway', 1: 'Kitchen', 2: 'Stairs', 3: 'Office', 4: 'Terrace' }
   },
   nl: {
     'app.title': 'Fallback-editor',
-    'app.tag': 'Bouw de regels die je controller volgt wanneer Home Assistant wegvalt. Elke regel koppelt één ingang aan één uitgang.',
+    'app.tag': 'Bouw de regels die je controller volgt wanneer Home Assistant wegvalt. Een regel koppelt één of meer ingangen aan één of meer uitgangen.',
     'step.1': 'Bouw je regels', 'step.2': 'Download het bestand', 'step.3': 'Upload het naar je controller',
     'btn.open': 'Bestand openen', 'btn.new': 'Nieuw', 'btn.download': 'Downloaden',
     'tab.rules': 'Regels', 'tab.test': 'Testen', 'tab.names': 'Namen', 'tab.file': 'Bestand',
     'add.rule': 'Regel toevoegen', 'presets': 'Snel toevoegen', 'search.ph': 'Zoek op nummer of naam',
     'sort': 'Sorteren op ingang', 'undo': 'Ongedaan maken', 'redo': 'Opnieuw', 'close': 'Sluiten',
     'preset.switch': 'Wandschakelaar schakelt een lamp om', 'preset.push': 'Drukknop schakelt een lamp om',
+    'preset.twoin': 'Eén lamp, meerdere schakelaars',
     'preset.hold': 'Lamp brandt zolang de knop ingedrukt is', 'preset.timer': 'Lamp aan gedurende een vaste tijd',
-    'preset.alloff': 'Eén knop zet drie lampen uit',
-    'rule': 'Regel', 'when': 'Wanneer', 'then': 'Dan', 'input': 'Ingang', 'output': 'Uitgang',
+    'preset.alloff': 'Eén knop zet meerdere lampen uit',
+    'rule': 'Regel', 'rule.name.ph': 'Geef deze regel een naam (optioneel)', 'when': 'Wanneer', 'then': 'Dan',
+    'input': 'Ingang', 'output': 'Uitgang',
+    'in.choose': 'Kies ingangen', 'in.change': 'Toevoegen of verwijderen', 'out.choose': 'Kies uitgangen', 'out.change': 'Toevoegen of verwijderen',
+    'remove': 'Verwijderen', 'multi.in': 'Elk van deze ingangen activeert de regel.', 'multi.out': 'Al deze uitgangen krijgen de actie.',
     'trigger.both': 'Schakelaar wijzigt', 'trigger.rising': 'Knop ingedrukt', 'trigger.falling': 'Knop losgelaten',
     'hint.both': 'Reageert op elke wijziging, aan én uit. Bedoeld voor wandschakelaars.',
     'hint.rising': 'Reageert zodra de ingang actief wordt. Bedoeld voor drukknoppen.',
@@ -648,29 +800,36 @@ const I18N = {
     'ahint.off_for': 'Zet uit en na deze tijd weer aan. Opnieuw triggeren start de tijd opnieuw.',
     'time': 'Duur', 'unit': 'Eenheid', 'unit.s': 'seconden', 'unit.min': 'minuten', 'unit.h': 'uren',
     'dup': 'Dupliceren', 'del': 'Verwijderen', 'deleted': 'Regel verwijderd.', 'undo.do': 'Ongedaan maken',
-    'count': '{n} van {max} regels',
+    'expands': '{n} in bestand',
+    'count': '{n} regels, {f} van {max} bestandsregels',
     'checks.ok': 'Geen problemen gevonden.', 'checks.err': '{n} op te lossen voor je kunt downloaden', 'checks.warn': '{n} om na te kijken',
+    'issue.noIn': 'Regel {n}: kies minstens één ingang.',
+    'issue.noOut': 'Regel {n}: kies minstens één uitgang.',
     'issue.seconds': 'Regel {n}: stel een duur in tussen 1 seconde en 18 uur.',
-    'issue.tooMany': 'Een controller bewaart maximaal {max} regels. Je hebt er {n}.',
+    'issue.tooMany': 'Een controller bewaart maximaal {max} bestandsregels (elk paar ingang en uitgang telt als één). Je hebt er {n}.',
     'issue.tooBig': 'Het bestand is {kb} KB en de controller aanvaardt maximaal 32 KB. Verwijder regels of laat de namen weg.',
+    'issue.metaBig': 'De namen en de opbouw van je regels zijn te groot om op de controller te bewaren. De regels werken wel, maar namen ontbreken als je van de controller downloadt.',
     'issue.dup': 'Regels {a} en {b} zijn identiek.',
     'issue.overlap': 'Regels {a} en {b} reageren allebei op ingang {in} en sturen uitgang {out} aan. Ze worden na elkaar uitgevoerd.',
     'empty.title': 'Nog geen regels', 'empty.text': 'Voeg je eerste regel toe of open een bestand dat je eerder maakte.',
     'empty.add': 'Eerste regel toevoegen', 'empty.example': 'Probeer een voorbeeld',
-    'pick.input': 'Kies een ingang', 'pick.output': 'Kies een uitgang',
-    'pick.sub': 'Ingang 1 is INPUT_01 op de controller.', 'pick.subOut': 'Uitgang 1 is CHANNEL_01 op de controller.',
-    'used': 'gebruikt in {n} regels',
+    'pick.inputs': 'Kies ingangen', 'pick.outputs': 'Kies uitgangen',
+    'pick.sub.in': 'Tik om te selecteren. De ingangen staan in blokken van 16, zoals op de controller.',
+    'pick.sub.out': 'Tik om te selecteren. De uitgangen staan in blokken van 16, zoals op de controller.',
+    'block': 'Blok {n}', 'range.in': 'Ingangen {a} tot {b}', 'range.out': 'Uitgangen {a} tot {b}',
+    'sel.block': 'Blok selecteren', 'sel.none': 'Blok wissen', 'sel.clear': 'Alles wissen', 'sel.count': '{n} geselecteerd', 'done': 'Klaar',
+    'used': 'gebruikt in {n} andere regels',
     'test.title': 'Probeer je regels uit', 'test.intro': 'Druk op de blauwe ingangen en kijk hoe de groene uitgangen reageren, zoals de controller doet wanneer Home Assistant wegvalt.',
     'test.reset': 'Test herstarten', 'test.empty': 'Voeg eerst regels toe, dan kun je ze hier testen.',
-    'test.inputs': 'Ingangen', 'test.outputs': 'Uitgangen', 'test.push': 'Drukknop: ingedrukt houden', 'test.switch': 'Schakelaar: klik om om te schakelen',
-    'test.mode': 'Gedraagt zich als schakelaar', 'test.on': 'Aan', 'test.off': 'Uit', 'test.left': 'nog {s} s',
+    'test.inputs': 'Ingangen', 'test.outputs': 'Uitgangen',
+    'test.mode': 'Gedraagt zich als schakelaar', 'test.left': 'nog {s} s',
     'test.note': 'Uitgangen starten uit. De test volgt dezelfde regels als de controller, maar de timing kan een fractie van een seconde afwijken.',
     'names.title': 'Namen', 'names.intro': 'Geef je ingangen en uitgangen een naam, zoals “Schakelaar hal”. De namen verschijnen in je regels.',
     'names.inputs': 'Ingangen', 'names.outputs': 'Uitgangen', 'names.ph': 'Naam', 'names.clear': 'Alle namen wissen',
     'file.title': 'Je fallback-bestand', 'file.intro': 'Dit is het bestand dat je naar de controller uploadt. Je kunt het later ook openen om het aan te passen.',
-    'file.name': 'Bestandsnaam', 'file.labels': 'Namen opslaan in het bestand', 'file.copy': 'Kopiëren',
-    'file.copied': 'Gekopieerd.', 'file.meta': '{n} regels, {kb} KB',
-    'file.labelsHint': 'De controller negeert namen.',
+    'file.name': 'Bestandsnaam', 'file.labels': 'Namen en opbouw van de regels opslaan in het bestand', 'file.copy': 'Kopiëren',
+    'file.copied': 'Gekopieerd.', 'file.meta': '{n} regels, {f} bestandsregels, {kb} KB',
+    'file.labelsHint': 'De controller bewaart ze samen met de regels, zodat je ze later kunt downloaden en aanpassen.',
     'dl.title': 'Je bestand is klaar', 'dl.saved': 'Opgeslagen als {name}. Zet het nu op je controller:',
     'dl.s1': 'Vul het IP-adres van je controller in (je vindt het in Home Assistant).',
     'dl.open': 'Controller-pagina openen',
@@ -678,7 +837,8 @@ const I18N = {
     'dl.s3': 'Kies het bestand en klik op Upload.',
     'dl.note': 'Deze editor opent enkel de pagina van je controller. Je bestand blijft op je computer tot je het daar uploadt.',
     'dl.done': 'Klaar',
-    'opened': '{name} geopend: {n} regels.', 'skipped': '{k} regels konden niet gelezen worden en zijn overgeslagen.',
+    'opened': '{name} geopend: {n} regels.', 'skipped': '{k} items konden niet gelezen worden en zijn overgeslagen.',
+    'regrouped': 'De opgeslagen opbouw kwam niet overeen met de regels, dus de regels zijn automatisch gegroepeerd.',
     'err.json': 'Dit bestand is geen geldige JSON.', 'err.format': 'Dit lijkt geen fallback-bestand.',
     'err.empty': 'Voeg eerst een regel toe.', 'err.fix': 'Los eerst de problemen op.',
     'new.done': 'Nieuw, leeg bestand gestart.', 'sorted': 'Gesorteerd op ingang.',
@@ -687,8 +847,9 @@ const I18N = {
     'leave': 'Je hebt wijzigingen die nog niet gedownload zijn.',
     'foot.text': 'Gemaakt voor de Logi.casa ESP Home Controller.',
     'foot.product': 'Productpagina', 'foot.quick': 'Snelstart', 'foot.support': 'Support',
-    'example.labelsIn': ['Wandschakelaar', 'Drukknop', 'Vasthoudknop', 'Timerknop', 'Pauzeknop', 'Alles uit', 'Loslaatknop'],
-    'example.labelsOut': ['Lamp 1', 'Lamp 2', 'Lamp 3', 'Lamp 4', 'Lamp 5']
+    'example.groups': ['Lamp hal', 'Lamp keuken (2 schakelaars)', 'Lamp aan zolang ingedrukt', 'Lamp uit bij loslaten', 'Timerlamp', 'Pauzelamp', 'Alle lichten uit'],
+    'example.labelsIn': { 0: 'Schakelaar hal', 1: 'Schakelaar keuken', 2: 'Vasthoudknop', 3: 'Timerknop', 4: 'Pauzeknop', 5: 'Alles-uit-knop', 7: 'Schakelaar keuken 2' },
+    'example.labelsOut': { 0: 'Hal', 1: 'Keuken', 2: 'Trap', 3: 'Bureau', 4: 'Terras' }
   }
 };
 
@@ -705,11 +866,14 @@ const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-mo
 const UNIT = { s: 1, min: 60, h: 3600 };
 const TRIGGER_ICON = { both: 'switch', rising: 'press', falling: 'release' };
 const ACTION_ICON = { toggle: 'swap', on: 'on', off: 'off', on_for: 'timer', off_for: 'timer' };
+const BLOCK = Core.LIMITS.block;
+const MAXCHIPS = 8;
+const sortNum = (a) => [...new Set(a)].sort((x, y) => x - y);
 
 /* ---------- state ---------- */
 let lang = store.get('logicasa.lang') || ((navigator.language || 'en').toLowerCase().startsWith('nl') ? 'nl' : 'en');
 let uidSeq = 1;
-const state = { rules: [], labels: { in: {}, out: {} }, fileName: 'fallback.json', includeLabels: true, dirty: false, filter: '', tab: 'rules' };
+const state = { groups: [], labels: { in: {}, out: {} }, fileName: 'fallback.json', includeLabels: true, dirty: false, filter: '', tab: 'rules' };
 const hist = { undo: [], redo: [], key: null, time: 0 };
 let listStale = true;
 
@@ -718,19 +882,21 @@ function t(key, p) {
   if (p && typeof s === 'string') s = s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? p[k] : m));
   return s;
 }
-const newRule = (o) => Object.assign({ uid: uidSeq++, in: 0, trigger: 'rising', out: 0, action: 'toggle', seconds: null, unit: null }, o || {});
-const byUid = (uid) => state.rules.find((r) => r.uid === uid);
+const newGroup = (o) => Object.assign({ uid: uidSeq++, name: '', ins: [0], trigger: 'rising', outs: [0], action: 'toggle', seconds: null, unit: null }, o || {});
+const byUid = (uid) => state.groups.find((g) => g.uid === uid);
 const bestUnit = (s) => (s > 0 && s % 3600 === 0 ? 'h' : s > 0 && s % 60 === 0 ? 'min' : 's');
-const unitOf = (r) => r.unit || bestUnit(r.seconds || 0);
-const plain = (r) => ({ in: r.in, trigger: r.trigger, out: r.out, action: r.action, seconds: Core.isTimer(r.action) ? r.seconds : null });
-const currentText = () => Core.serialize(state.rules.map(plain), state.labels, state.includeLabels);
+const unitOf = (g) => g.unit || bestUnit(g.seconds || 0);
+const plainG = (g) => ({ name: g.name || '', ins: sortNum(g.ins), trigger: g.trigger, outs: sortNum(g.outs), action: g.action, seconds: Core.isTimer(g.action) ? g.seconds : null });
+const full = (g) => ({ ...plainG(g), unit: g.unit });
+const currentText = () => Core.serialize(state.groups.map(plainG), state.labels, state.includeLabels);
 const textBytes = (s) => new Blob([s]).size;
 const labelOf = (kind, n) => state.labels[kind][n] || '';
+const flatCount = () => Core.expand(state.groups.map(plainG)).length;
 
-function snapshot() { return JSON.stringify({ rules: state.rules.map((r) => ({ ...plain(r), unit: r.unit })), labels: state.labels }); }
+function snapshot() { return JSON.stringify({ groups: state.groups.map(full), labels: state.labels }); }
 function restore(s) {
   const d = JSON.parse(s);
-  state.rules = d.rules.map((r) => newRule(r));
+  state.groups = d.groups.map((g) => newGroup(g));
   state.labels = d.labels;
 }
 
@@ -747,7 +913,6 @@ function mutate(fn, key) {
   state.dirty = true;
   changed(!key);
 }
-
 function undo() {
   if (!hist.undo.length) return;
   hist.redo.push(snapshot());
@@ -769,14 +934,12 @@ let saveTimer = null;
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    store.set('logicasa.fallback.draft', JSON.stringify({ rules: state.rules.map((r) => ({ ...plain(r), unit: r.unit })), labels: state.labels, fileName: state.fileName, includeLabels: state.includeLabels }));
+    store.set('logicasa.fallback.draft2', JSON.stringify({ groups: state.groups.map(full), labels: state.labels, fileName: state.fileName, includeLabels: state.includeLabels }));
   }, 400);
 }
 
-/* called after every change */
 function changed(rerenderList, everything) {
   if (rerenderList) listStale = true;
-  updateChrome();
   renderChecks();
   if (state.tab === 'rules' && listStale) renderList();
   if (state.tab === 'names' && everything) renderNames();
@@ -814,19 +977,19 @@ function applyI18n() {
   lb.textContent = lang === 'en' ? 'NL' : 'EN';
   lb.setAttribute('aria-label', lang === 'en' ? 'Nederlands' : 'English');
   lb.title = lb.getAttribute('aria-label');
-  $('#presetPop').innerHTML = ['switch', 'push', 'hold', 'timer', 'alloff'].map((k) => `<button type="button" data-preset="${k}">${esc(t('preset.' + k))}</button>`).join('');
+  $('#presetPop').innerHTML = ['switch', 'push', 'twoin', 'hold', 'timer', 'alloff'].map((k) => `<button type="button" data-preset="${k}">${esc(t('preset.' + k))}</button>`).join('');
   $('#search').setAttribute('aria-label', t('search.ph'));
   listStale = true;
   changed(true, true);
   if (state.tab === 'names') renderNames();
 }
 
-/* ---------- chrome (counts, buttons) ---------- */
+/* ---------- chrome ---------- */
 let lastIssues = [];
 function updateChrome() {
-  const n = state.rules.length;
+  const n = state.groups.length;
   $('#ruleBadge').textContent = n;
-  $('#count').textContent = t('count', { n, max: Core.LIMITS.rules });
+  $('#count').textContent = t('count', { n, f: flatCount(), max: Core.LIMITS.rules });
   $('#undoBtn').disabled = !hist.undo.length;
   $('#redoBtn').disabled = !hist.redo.length;
   $('#undoBtn').style.opacity = hist.undo.length ? 1 : .4;
@@ -840,11 +1003,12 @@ function updateChrome() {
 }
 
 function renderChecks() {
-  lastIssues = Core.validate(state.rules, textBytes(currentText()));
+  const g = state.groups.map(plainG).map((x, i) => ({ ...x, uid: state.groups[i].uid }));
+  lastIssues = Core.validate(g, textBytes(currentText()), Core.metaBytes(state.groups.map(plainG), state.labels), state.includeLabels);
   const box = $('#checks');
   const errs = lastIssues.filter((i) => i.level === 'error');
   const warns = lastIssues.filter((i) => i.level === 'warn');
-  if (!state.rules.length) { box.innerHTML = ''; updateChrome(); return; }
+  if (!state.groups.length) { box.innerHTML = ''; updateChrome(); return; }
   if (!lastIssues.length) {
     box.innerHTML = `<div class="checks ok"><svg class="ic"><use href="#i-check"/></svg><span>${esc(t('checks.ok'))}</span></div>`;
   } else {
@@ -856,48 +1020,58 @@ function renderChecks() {
 }
 
 /* ---------- rule list ---------- */
-const matches = (r) => {
+const matches = (g) => {
   const q = state.filter.trim().toLowerCase();
   if (!q) return true;
   const num = Number(q);
-  if (Number.isInteger(num) && (r.in + 1 === num || r.out + 1 === num)) return true;
-  return labelOf('in', r.in).toLowerCase().includes(q) || labelOf('out', r.out).toLowerCase().includes(q);
+  if (Number.isInteger(num) && (g.ins.includes(num - 1) || g.outs.includes(num - 1))) return true;
+  if ((g.name || '').toLowerCase().includes(q)) return true;
+  return g.ins.some((i) => labelOf('in', i).toLowerCase().includes(q)) || g.outs.some((o) => labelOf('out', o).toLowerCase().includes(q));
 };
 
-function pickHTML(kind, n) {
-  const nm = labelOf(kind, n);
-  return `<button type="button" class="pick" data-pick="${kind}"><span class="pick-text"><b>${esc(t(kind === 'in' ? 'input' : 'output'))} ${n + 1}</b>${nm ? `<small>${esc(nm)}</small>` : ''}</span><svg class="ic"><use href="#i-chevron"/></svg></button>`;
+function chipsHTML(kind, g) {
+  const arr = kind === 'in' ? g.ins : g.outs;
+  let h = arr.slice(0, MAXCHIPS).map((n) => {
+    const nm = labelOf(kind, n);
+    return `<span class="chip"><b>${n + 1}</b>${nm ? `<small>${esc(nm)}</small>` : ''}<button type="button" data-rm="${n}" data-side="${kind}" title="${esc(t('remove'))} ${n + 1}" aria-label="${esc(t('remove'))} ${n + 1}"><svg class="ic"><use href="#i-close"/></svg></button></span>`;
+  }).join('');
+  if (arr.length > MAXCHIPS) h += `<button type="button" class="chip more" data-pick="${kind}">+${arr.length - MAXCHIPS}</button>`;
+  h += `<button type="button" class="btn small chip-add" data-pick="${kind}"><svg class="ic"><use href="#i-plus"/></svg><span>${esc(t(kind + '.' + (arr.length ? 'change' : 'choose')))}</span></button>`;
+  return `<div class="chips">${h}</div>`;
 }
 
-function durHTML(r) {
-  if (!Core.isTimer(r.action)) return '';
-  const u = unitOf(r);
-  const v = r.seconds ? +(r.seconds / UNIT[u]).toFixed(3) : '';
+function durHTML(g) {
+  if (!Core.isTimer(g.action)) return '';
+  const u = unitOf(g);
+  const v = g.seconds ? +(g.seconds / UNIT[u]).toFixed(3) : '';
   return `<div class="dur"><label>${esc(t('time'))}<input class="dur-val" type="number" inputmode="decimal" min="1" step="any" value="${v}"></label><select class="dur-unit" aria-label="${esc(t('unit'))}">${['s', 'min', 'h'].map((x) => `<option value="${x}"${x === u ? ' selected' : ''}>${esc(t('unit.' + x))}</option>`).join('')}</select></div>`;
 }
 
-function ruleInner(r, idx) {
-  const trig = Core.TRIGGERS.map((k) => `<button type="button" class="seg-btn" data-trigger="${k}" aria-pressed="${r.trigger === k}"><svg class="ic"><use href="#i-${TRIGGER_ICON[k]}"/></svg><span>${esc(t('trigger.' + k))}</span></button>`).join('');
-  const acts = Core.ACTIONS.map((k) => `<button type="button" class="seg-btn" data-action="${k}" aria-pressed="${r.action === k}"><svg class="ic"><use href="#i-${ACTION_ICON[k]}"/></svg><span>${esc(t('action.' + k))}</span></button>`).join('');
+function ruleInner(g, idx) {
+  const trig = Core.TRIGGERS.map((k) => `<button type="button" class="seg-btn" data-trigger="${k}" aria-pressed="${g.trigger === k}"><svg class="ic"><use href="#i-${TRIGGER_ICON[k]}"/></svg><span>${esc(t('trigger.' + k))}</span></button>`).join('');
+  const acts = Core.ACTIONS.map((k) => `<button type="button" class="seg-btn" data-action="${k}" aria-pressed="${g.action === k}"><svg class="ic"><use href="#i-${ACTION_ICON[k]}"/></svg><span>${esc(t('action.' + k))}</span></button>`).join('');
+  const n = g.ins.length * g.outs.length;
   return `
     <div class="rule-top"><span class="rule-n">${esc(t('rule'))} ${idx + 1}</span>
+      <input class="rule-name" type="text" maxlength="${Core.LIMITS.nameLen}" value="${esc(g.name || '')}" placeholder="${esc(t('rule.name.ph'))}" aria-label="${esc(t('rule.name.ph'))}">
+      <span class="expands" title="${esc(t('expands', { n }))}">${esc(t('expands', { n }))}</span>
       <span class="tools">
         <button type="button" class="icon-btn" data-dup title="${esc(t('dup'))}" aria-label="${esc(t('dup'))}"><svg class="ic"><use href="#i-copy"/></svg></button>
         <button type="button" class="icon-btn" data-del title="${esc(t('del'))}" aria-label="${esc(t('del'))}"><svg class="ic"><use href="#i-trash"/></svg></button>
       </span></div>
     <div class="half in">
       <div class="half-h">${esc(t('when'))}</div>
-      ${pickHTML('in', r.in)}
+      ${chipsHTML('in', g)}
       <div class="seg" role="group">${trig}</div>
-      <p class="hint">${esc(t('hint.' + r.trigger))}</p>
+      <p class="hint">${esc(t('hint.' + g.trigger))}${g.ins.length > 1 ? ' ' + esc(t('multi.in')) : ''}</p>
     </div>
     <div class="link"><svg class="ic"><use href="#i-arrow"/></svg></div>
     <div class="half out">
       <div class="half-h">${esc(t('then'))}</div>
-      ${pickHTML('out', r.out)}
+      ${chipsHTML('out', g)}
       <div class="seg" role="group">${acts}</div>
-      ${durHTML(r)}
-      <p class="hint">${esc(t('ahint.' + r.action))}</p>
+      ${durHTML(g)}
+      <p class="hint">${esc(t('ahint.' + g.action))}${g.outs.length > 1 ? ' ' + esc(t('multi.out')) : ''}</p>
     </div>`;
 }
 
@@ -906,7 +1080,7 @@ function focusKey(el) {
   const c = el.closest('.rule');
   if (!c) return null;
   const d = el.dataset || {};
-  const sel = d.trigger ? `[data-trigger="${d.trigger}"]` : d.action ? `[data-action="${d.action}"]` : d.pick ? `[data-pick="${d.pick}"]` : 'dup' in d ? '[data-dup]' : el.classList.contains('dur-unit') ? '.dur-unit' : null;
+  const sel = d.trigger ? `[data-trigger="${d.trigger}"]` : d.action ? `[data-action="${d.action}"]` : d.pick ? `.chip-add[data-pick="${d.pick}"]` : d.rm !== undefined ? `.chip-add[data-pick="${d.side}"]` : 'dup' in d ? '[data-dup]' : el.classList.contains('dur-unit') ? '.dur-unit' : null;
   return sel ? { uid: c.dataset.uid, sel } : null;
 }
 function restoreFocus(k) {
@@ -917,24 +1091,21 @@ function restoreFocus(k) {
 }
 
 function renderList() {
-  const list = $('#list');
   const fk = focusKey(document.activeElement);
   const rows = [];
-  state.rules.forEach((r, idx) => { if (matches(r)) rows.push(`<article class="rule" id="rule-${r.uid}" data-uid="${r.uid}">${ruleInner(r, idx)}</article>`); });
-  list.innerHTML = rows.join('');
+  state.groups.forEach((g, idx) => { if (matches(g)) rows.push(`<article class="rule" id="rule-${g.uid}" data-uid="${g.uid}">${ruleInner(g, idx)}</article>`); });
+  $('#list').innerHTML = rows.join('');
   listStale = false;
   updateChrome();
   restoreFocus(fk);
 }
-
-function renderCard(r) {
-  const card = document.getElementById('rule-' + r.uid);
+function renderCard(g) {
+  const card = document.getElementById('rule-' + g.uid);
   if (!card) return;
   const fk = focusKey(document.activeElement);
-  card.innerHTML = ruleInner(r, state.rules.indexOf(r));
+  card.innerHTML = ruleInner(g, state.groups.indexOf(g));
   restoreFocus(fk);
 }
-
 function scrollToRule(uid, focusPick) {
   const el = document.getElementById('rule-' + uid);
   if (!el) return;
@@ -942,7 +1113,7 @@ function scrollToRule(uid, focusPick) {
   el.classList.remove('flash');
   void el.offsetWidth;
   el.classList.add('flash');
-  if (focusPick) { const b = el.querySelector('[data-pick="in"]'); if (b) b.focus({ preventScroll: true }); }
+  if (focusPick) { const b = el.querySelector('.rule-name'); if (b) b.focus({ preventScroll: true }); }
 }
 
 const list = $('#list');
@@ -950,43 +1121,56 @@ list.addEventListener('click', (e) => {
   const b = e.target.closest('button');
   const card = e.target.closest('.rule');
   if (!b || !card) return;
-  const r = byUid(+card.dataset.uid);
-  if (!r) return;
-  if (b.dataset.pick) { openPicker(b.dataset.pick, r.uid); return; }
-  if (b.dataset.trigger) { mutate(() => { r.trigger = b.dataset.trigger; }); renderCard(r); return; }
+  const g = byUid(+card.dataset.uid);
+  if (!g) return;
+  if (b.dataset.pick) { openPicker(b.dataset.pick, g.uid); return; }
+  if (b.dataset.rm !== undefined) {
+    const key = b.dataset.side === 'in' ? 'ins' : 'outs';
+    const n = +b.dataset.rm;
+    mutate(() => { g[key] = g[key].filter((x) => x !== n); });
+    renderCard(g);
+    return;
+  }
+  if (b.dataset.trigger) { mutate(() => { g.trigger = b.dataset.trigger; }); renderCard(g); return; }
   if (b.dataset.action) {
     mutate(() => {
-      r.action = b.dataset.action;
-      if (Core.isTimer(r.action)) { if (!r.seconds) { r.seconds = 300; r.unit = 'min'; } } else { r.seconds = null; r.unit = null; }
+      g.action = b.dataset.action;
+      if (Core.isTimer(g.action)) { if (!g.seconds) { g.seconds = 300; g.unit = 'min'; } } else { g.seconds = null; g.unit = null; }
     });
-    renderCard(r);
+    renderCard(g);
     return;
   }
   if ('dup' in b.dataset) {
-    const copy = newRule({ ...plain(r), unit: r.unit });
-    mutate(() => { state.rules.splice(state.rules.indexOf(r) + 1, 0, copy); });
+    const copy = newGroup(full(g));
+    mutate(() => { state.groups.splice(state.groups.indexOf(g) + 1, 0, copy); });
     scrollToRule(copy.uid);
     return;
   }
   if ('del' in b.dataset) {
-    mutate(() => { state.rules.splice(state.rules.indexOf(r), 1); });
+    mutate(() => { state.groups.splice(state.groups.indexOf(g), 1); });
     toast(t('deleted'), { label: t('undo.do'), fn: undo });
   }
 });
 list.addEventListener('input', (e) => {
-  if (!e.target.classList.contains('dur-val')) return;
   const card = e.target.closest('.rule');
-  const r = byUid(+card.dataset.uid);
+  if (!card) return;
+  const g = byUid(+card.dataset.uid);
+  if (e.target.classList.contains('rule-name')) {
+    const v = e.target.value.trim();
+    mutate(() => { g.name = v; }, 'gname' + g.uid);
+    return;
+  }
+  if (!e.target.classList.contains('dur-val')) return;
   const v = parseFloat(e.target.value);
-  mutate(() => { r.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[unitOf(r)]) : null; }, 'dur' + r.uid);
+  mutate(() => { g.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[unitOf(g)]) : null; }, 'dur' + g.uid);
 });
 list.addEventListener('change', (e) => {
   if (!e.target.classList.contains('dur-unit')) return;
   const card = e.target.closest('.rule');
-  const r = byUid(+card.dataset.uid);
+  const g = byUid(+card.dataset.uid);
   const v = parseFloat($('.dur-val', card).value);
-  mutate(() => { r.unit = e.target.value; r.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[r.unit]) : null; });
-  renderCard(r);
+  mutate(() => { g.unit = e.target.value; g.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[g.unit]) : null; });
+  renderCard(g);
 });
 $('#checks').addEventListener('click', (e) => {
   const b = e.target.closest('[data-goto]');
@@ -998,34 +1182,39 @@ $('#checks').addEventListener('click', (e) => {
 /* ---------- adding ---------- */
 function freeList(kind, count) {
   const max = kind === 'in' ? Core.LIMITS.inputs : Core.LIMITS.outputs;
-  const used = new Set(state.rules.map((r) => r[kind]));
+  const key = kind === 'in' ? 'ins' : 'outs';
+  const used = new Set();
+  state.groups.forEach((g) => g[key].forEach((n) => used.add(n)));
   const out = [];
   for (let i = 0; i < max && out.length < count; i++) if (!used.has(i)) out.push(i);
-  while (out.length < count) out.push((out[out.length - 1] + 1 || 0) % max);
+  let i = 0;
+  while (out.length < count) { if (!out.includes(i % max)) out.push(i % max); i++; }
   return out;
 }
 function clearFilter() { if (state.filter) { state.filter = ''; $('#search').value = ''; } }
 
 function addRule() {
   clearFilter();
-  const r = newRule({ in: freeList('in', 1)[0], out: freeList('out', 1)[0] });
-  mutate(() => { state.rules.push(r); });
-  scrollToRule(r.uid, true);
+  const g = newGroup({ ins: freeList('in', 1), outs: freeList('out', 1) });
+  mutate(() => { state.groups.push(g); });
+  scrollToRule(g.uid, true);
 }
 const PRESETS = {
   switch: () => [{ trigger: 'both', action: 'toggle' }],
   push: () => [{ trigger: 'rising', action: 'toggle' }],
+  twoin: () => [{ trigger: 'both', action: 'toggle', nIn: 2 }],
   hold: () => [{ trigger: 'rising', action: 'on' }, { trigger: 'falling', action: 'off' }],
   timer: () => [{ trigger: 'rising', action: 'on_for', seconds: 300, unit: 'min' }],
-  alloff: () => [0, 1, 2].map(() => ({ trigger: 'rising', action: 'off' }))
+  alloff: () => [{ trigger: 'rising', action: 'off', nOut: 3 }]
 };
 function addPreset(key) {
   clearFilter();
   const specs = PRESETS[key]();
-  const inn = freeList('in', 1)[0];
-  const outs = freeList('out', key === 'alloff' ? 3 : 1);
-  const made = specs.map((s, i) => newRule({ in: inn, out: key === 'alloff' ? outs[i] : outs[0], ...s }));
-  mutate(() => { made.forEach((r) => state.rules.push(r)); });
+  const nIn = Math.max(...specs.map((s) => s.nIn || 1));
+  const nOut = Math.max(...specs.map((s) => s.nOut || 1));
+  const ins = freeList('in', nIn), outs = freeList('out', nOut);
+  const made = specs.map((s) => { const o = { ...s }; delete o.nIn; delete o.nOut; return newGroup({ ins: ins.slice(), outs: outs.slice(), ...o }); });
+  mutate(() => { made.forEach((g) => state.groups.push(g)); });
   scrollToRule(made[0].uid, true);
 }
 $('#addBtn').addEventListener('click', addRule);
@@ -1041,53 +1230,99 @@ document.addEventListener('click', (e) => { if (presetMenu.open && !presetMenu.c
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && presetMenu.open) { presetMenu.open = false; $('summary', presetMenu).focus(); } });
 
 $('#sortBtn').addEventListener('click', () => {
-  mutate(() => { state.rules.sort((a, b) => a.in - b.in || a.out - b.out || 0); });
+  mutate(() => { state.groups.sort((a, b) => (a.ins[0] ?? 99) - (b.ins[0] ?? 99) || (a.outs[0] ?? 99) - (b.outs[0] ?? 99)); });
   toast(t('sorted'));
 });
 $('#undoBtn').addEventListener('click', undo);
 $('#redoBtn').addEventListener('click', redo);
 $('#search').addEventListener('input', (e) => { state.filter = e.target.value; renderList(); });
 
-/* ---------- picker dialog ---------- */
+/* ---------- picker dialog (multi-select, shown in blocks of 16) ---------- */
 const picker = $('#picker');
 let pickCtx = null;
+function maxOf(kind) { return kind === 'in' ? Core.LIMITS.inputs : Core.LIMITS.outputs; }
+
 function openPicker(kind, uid) {
-  const r = byUid(uid);
-  if (!r) return;
-  pickCtx = { kind, uid };
-  const max = kind === 'in' ? Core.LIMITS.inputs : Core.LIMITS.outputs;
-  const usage = new Array(max).fill(0);
-  state.rules.forEach((x) => { usage[x[kind]]++; });
-  $('#pickerTitle').textContent = t(kind === 'in' ? 'pick.input' : 'pick.output');
-  $('#pickerSub').textContent = t(kind === 'in' ? 'pick.sub' : 'pick.subOut');
-  $('#pickerGrid').innerHTML = Array.from({ length: max }, (_, i) => {
-    const nm = labelOf(kind, i);
-    const tip = [t(kind === 'in' ? 'input' : 'output') + ' ' + (i + 1), nm, usage[i] ? t('used', { n: usage[i] }) : ''].filter(Boolean).join(' – ');
-    return `<button type="button" class="tile" data-n="${i}" aria-pressed="${i === r[kind]}" title="${esc(tip)}"><b>${i + 1}</b><small>${esc(nm)}</small>${usage[i] ? `<i class="used">${usage[i]}</i>` : ''}</button>`;
-  }).join('');
+  const g = byUid(uid);
+  if (!g) return;
+  const key = kind === 'in' ? 'ins' : 'outs';
+  const usage = new Array(maxOf(kind)).fill(0);
+  state.groups.forEach((x) => { if (x !== g) x[key].forEach((n) => { usage[n]++; }); });
+  pickCtx = { kind, uid, key, sel: new Set(g[key]), start: g[key].slice(), usage };
+  $('#pickerTitle').textContent = t(kind === 'in' ? 'pick.inputs' : 'pick.outputs');
+  $('#pickerSub').textContent = t('pick.sub.' + kind);
+  const blocks = [];
+  for (let b = 0; b < maxOf(kind) / BLOCK; b++) {
+    const tiles = Array.from({ length: BLOCK }, (_, k) => {
+      const i = b * BLOCK + k;
+      const nm = labelOf(kind, i);
+      const tip = [t(kind === 'in' ? 'input' : 'output') + ' ' + (i + 1), nm, usage[i] ? t('used', { n: usage[i] }) : ''].filter(Boolean).join(' – ');
+      return `<button type="button" class="tile" data-n="${i}" aria-pressed="false" title="${esc(tip)}"><b>${i + 1}</b><small>${esc(nm)}</small>${usage[i] ? `<i class="used">${usage[i]}</i>` : ''}</button>`;
+    }).join('');
+    blocks.push(`<section class="blk" data-b="${b}"><div class="blk-h"><h3>${esc(t('block', { n: b + 1 }))}</h3><span class="blk-r">${esc(t('range.' + kind, { a: b * BLOCK + 1, b: (b + 1) * BLOCK }))}</span><button type="button" class="btn small" data-blk="${b}"></button></div><div class="tiles">${tiles}</div></section>`);
+  }
+  $('#pickerGrid').innerHTML = blocks.join('');
   picker.className = kind;
+  paintPicker();
   picker.showModal();
-  const cur = $(`.tile[data-n="${r[kind]}"]`, picker);
-  if (cur) { cur.focus({ preventScroll: true }); cur.scrollIntoView({ block: 'nearest' }); }
+  const first = $('.tile[aria-pressed="true"]', picker) || $('.tile', picker);
+  if (first) first.focus({ preventScroll: true });
+}
+function paintPicker() {
+  if (!pickCtx) return;
+  $$('#pickerGrid .tile').forEach((el) => { el.setAttribute('aria-pressed', String(pickCtx.sel.has(+el.dataset.n))); });
+  $$('#pickerGrid .blk').forEach((blk) => {
+    const b = +blk.dataset.b;
+    const all = Array.from({ length: BLOCK }, (_, k) => pickCtx.sel.has(b * BLOCK + k)).every(Boolean);
+    $('[data-blk]', blk).textContent = t(all ? 'sel.none' : 'sel.block');
+  });
+  $('#pickCount').textContent = t('sel.count', { n: pickCtx.sel.size });
 }
 $('#pickerGrid').addEventListener('click', (e) => {
-  const b = e.target.closest('.tile');
-  if (!b || !pickCtx) return;
-  const r = byUid(pickCtx.uid);
-  const n = +b.dataset.n;
-  const kind = pickCtx.kind;
-  picker.close();
-  if (r && r[kind] !== n) { mutate(() => { r[kind] = n; }); renderCard(r); }
+  if (!pickCtx) return;
+  const tile = e.target.closest('.tile');
+  const blkBtn = e.target.closest('[data-blk]');
+  if (tile) {
+    const n = +tile.dataset.n;
+    if (pickCtx.sel.has(n)) pickCtx.sel.delete(n); else pickCtx.sel.add(n);
+  } else if (blkBtn) {
+    const b = +blkBtn.dataset.blk;
+    const nums = Array.from({ length: BLOCK }, (_, k) => b * BLOCK + k);
+    const all = nums.every((n) => pickCtx.sel.has(n));
+    nums.forEach((n) => { if (all) pickCtx.sel.delete(n); else pickCtx.sel.add(n); });
+  } else return;
+  paintPicker();
+});
+$('#pickClear').addEventListener('click', () => { if (pickCtx) { pickCtx.sel.clear(); paintPicker(); } });
+picker.addEventListener('close', () => {
+  const ctx = pickCtx;
+  pickCtx = null;
+  if (!ctx) return;
+  const g = byUid(ctx.uid);
+  const now = sortNum([...ctx.sel]);
+  if (!g || JSON.stringify(now) === JSON.stringify(sortNum(ctx.start))) return;
+  mutate(() => { g[ctx.key] = now; });
+  renderCard(g);
 });
 
-/* generic dialog closing */
 $$('dialog').forEach((d) => {
   d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
 });
 
 /* ---------- names tab ---------- */
 function renderNames() {
-  const mk = (kind, max) => Array.from({ length: max }, (_, i) => `<label class="name-row"><span class="name-n">${i + 1}</span><input type="text" maxlength="${Core.LIMITS.labelLen}" data-kind="${kind}" data-n="${i}" value="${esc(labelOf(kind, i))}" placeholder="${esc(t('names.ph'))}" aria-label="${esc(t(kind === 'in' ? 'input' : 'output'))} ${i + 1}"></label>`).join('');
+  const mk = (kind, max) => {
+    let h = '';
+    for (let b = 0; b < max / BLOCK; b++) {
+      h += `<div class="name-blk"><h4>${esc(t('block', { n: b + 1 }))} <span>${esc(t('range.' + kind, { a: b * BLOCK + 1, b: (b + 1) * BLOCK }))}</span></h4><div class="name-grid">`;
+      for (let k = 0; k < BLOCK; k++) {
+        const i = b * BLOCK + k;
+        h += `<label class="name-row"><span class="name-n">${i + 1}</span><input type="text" maxlength="${Core.LIMITS.labelLen}" data-kind="${kind}" data-n="${i}" value="${esc(labelOf(kind, i))}" placeholder="${esc(t('names.ph'))}" aria-label="${esc(t(kind === 'in' ? 'input' : 'output'))} ${i + 1}"></label>`;
+      }
+      h += '</div></div>';
+    }
+    return h;
+  };
   $('#namesIn').innerHTML = mk('in', Core.LIMITS.inputs);
   $('#namesOut').innerHTML = mk('out', Core.LIMITS.outputs);
 }
@@ -1096,6 +1331,7 @@ $('#view-names').addEventListener('input', (e) => {
   if (!el.dataset || !el.dataset.kind) return;
   const kind = el.dataset.kind, n = +el.dataset.n, v = el.value.trim();
   mutate(() => { if (v) state.labels[kind][n] = v; else delete state.labels[kind][n]; }, 'name' + kind + n);
+  listStale = true;
 });
 $('#namesClear').addEventListener('click', () => {
   mutate(() => { state.labels = { in: {}, out: {} }; });
@@ -1106,7 +1342,7 @@ $('#namesClear').addEventListener('click', () => {
 function renderFile() {
   const text = currentText();
   $('#json').textContent = text;
-  $('#fileMeta').textContent = t('file.meta', { n: state.rules.length, kb: (textBytes(text) / 1024).toFixed(1) }) + (state.includeLabels ? ' · ' + t('file.labelsHint') : '');
+  $('#fileMeta').textContent = t('file.meta', { n: state.groups.length, f: flatCount(), kb: (textBytes(text) / 1024).toFixed(1) }) + (state.includeLabels ? ' · ' + t('file.labelsHint') : '');
   if (document.activeElement !== $('#fileName')) $('#fileName').value = state.fileName;
   $('#incLabels').checked = state.includeLabels;
 }
@@ -1133,14 +1369,16 @@ $$('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.ta
 /* ---------- test (simulator) ---------- */
 let sim = null, simTimer = null;
 const simMode = {};
-function usedList(kind) { return [...new Set(state.rules.map((r) => r[kind]))].sort((a, b) => a - b); }
+const flatRules = () => Core.expand(state.groups.map(plainG));
+function usedList(kind) { return sortNum(flatRules().map((r) => r[kind])); }
 function stopSim() { clearInterval(simTimer); simTimer = null; }
 function buildSim() {
   const ins = usedList('in'), outs = usedList('out');
-  sim = new Core.Sim(state.rules.map(plain));
-  $('#simEmpty').hidden = state.rules.length > 0;
-  $('#simCols').hidden = state.rules.length === 0;
-  ins.forEach((i) => { if (!(i in simMode)) simMode[i] = state.rules.some((r) => r.in === i && r.trigger === 'both') ? 'switch' : 'push'; });
+  const rules = flatRules();
+  sim = new Core.Sim(rules);
+  $('#simEmpty').hidden = rules.length > 0;
+  $('#simCols').hidden = rules.length === 0;
+  ins.forEach((i) => { if (!(i in simMode)) simMode[i] = rules.some((r) => r.in === i && r.trigger === 'both') ? 'switch' : 'push'; });
   $('#simIn').innerHTML = ins.map((i) => {
     const nm = labelOf('in', i);
     return `<div class="sim-in" data-i="${i}"><button type="button" class="sim-btn" aria-pressed="false"><b><svg class="ic"><use href="#i-${simMode[i] === 'switch' ? 'switch' : 'press'}"/></svg>${esc(t('input'))} ${i + 1}</b><small>${esc(nm)}</small></button><button type="button" class="sim-mode" aria-pressed="${simMode[i] === 'switch'}" title="${esc(t('test.mode'))}" aria-label="${esc(t('test.mode'))}"><svg class="ic"><use href="#i-lock"/></svg></button></div>`;
@@ -1156,15 +1394,13 @@ function paintSim() {
   if (!sim) return;
   const now = performance.now();
   $$('#simIn .sim-in').forEach((el) => {
-    const i = +el.dataset.i;
-    $('.sim-btn', el).setAttribute('aria-pressed', String(sim.inputs[i]));
+    $('.sim-btn', el).setAttribute('aria-pressed', String(sim.inputs[+el.dataset.i]));
   });
   $$('#simOut .lamp').forEach((el) => {
     const o = +el.dataset.o;
     const on = sim.outputs[o];
     el.classList.toggle('on', on);
-    const use = $('.bulb use', el);
-    use.setAttribute('href', on ? '#i-bulb-on' : '#i-bulb');
+    $('.bulb use', el).setAttribute('href', on ? '#i-bulb-on' : '#i-bulb');
     const tm = sim.timers.get(o);
     $('.timer', el).textContent = tm ? t('test.left', { s: Math.max(0, Math.ceil((tm.end - now) / 1000)) }) : '';
   });
@@ -1177,7 +1413,7 @@ function paintSim() {
     if (!b) return;
     const el = b.closest('.sim-in'), i = +el.dataset.i;
     if (simMode[i] === 'switch') { press(el, !sim.inputs[i]); return; }
-    b.setPointerCapture(e.pointerId);
+    try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     press(el, true);
   });
   const release = (e) => {
@@ -1218,16 +1454,15 @@ function paintSim() {
 /* ---------- open / new / example / download ---------- */
 function loadParsed(res, name) {
   mutate(() => {
-    state.rules = res.rules.map((r) => newRule(r));
+    state.groups = res.groups.map((g) => newGroup({ ...g, unit: Core.isTimer(g.action) ? bestUnit(g.seconds) : null }));
     state.labels = res.labels;
     state.fileName = name || state.fileName;
     state.includeLabels = true;
-    state.rules.forEach((r) => { r.unit = Core.isTimer(r.action) ? bestUnit(r.seconds) : null; });
   });
   state.dirty = false;
   clearFilter();
   showTab('rules');
-  let msg = t('opened', { name: name || 'file', n: res.rules.length });
+  let msg = t('opened', { name: name || 'file', n: res.groups.length });
   if (res.skipped) msg += ' ' + t('skipped', { k: res.skipped });
   toast(msg, { label: t('undo.do'), fn: undo });
 }
@@ -1247,8 +1482,8 @@ $('#emptyOpen').addEventListener('click', () => $('#fileInput').click());
 $('#fileInput').addEventListener('change', (e) => { readFile(e.target.files[0]); e.target.value = ''; });
 
 $('#newBtn').addEventListener('click', () => {
-  if (!state.rules.length && !Object.keys(state.labels.in).length && !Object.keys(state.labels.out).length) return;
-  mutate(() => { state.rules = []; state.labels = { in: {}, out: {} }; state.fileName = 'fallback.json'; });
+  if (!state.groups.length && !Object.keys(state.labels.in).length && !Object.keys(state.labels.out).length) return;
+  mutate(() => { state.groups = []; state.labels = { in: {}, out: {} }; state.fileName = 'fallback.json'; });
   state.dirty = false;
   clearFilter();
   showTab('rules');
@@ -1256,18 +1491,18 @@ $('#newBtn').addEventListener('click', () => {
 });
 
 function loadExample() {
-  const R = (i, trigger, o, action, seconds) => ({ in: i, trigger, out: o, action, seconds: seconds || null });
-  const rules = [
-    R(0, 'both', 0, 'toggle'), R(1, 'rising', 1, 'toggle'),
-    R(2, 'rising', 2, 'on'), R(2, 'falling', 2, 'off'),
-    R(3, 'rising', 3, 'on_for', 10), R(4, 'rising', 4, 'off_for', 10),
-    R(5, 'rising', 0, 'off'), R(5, 'rising', 1, 'off'), R(5, 'rising', 2, 'off'), R(5, 'rising', 3, 'off'),
-    R(6, 'falling', 1, 'toggle')
+  const names = t('example.groups');
+  const G = (i, ins, trigger, outs, action, seconds) => ({ name: names[i], ins, trigger, outs, action, seconds: seconds || null });
+  const groups = [
+    G(0, [0], 'both', [0], 'toggle'),
+    G(1, [1, 7], 'rising', [1], 'toggle'),
+    G(2, [2], 'rising', [2], 'on'),
+    G(3, [2], 'falling', [2], 'off'),
+    G(4, [3], 'rising', [3], 'on_for', 10),
+    G(5, [4], 'rising', [4], 'off_for', 10),
+    G(6, [5], 'rising', [0, 1, 2, 3], 'off')
   ];
-  const labels = { in: {}, out: {} };
-  t('example.labelsIn').forEach((s, i) => { labels.in[i] = s; });
-  t('example.labelsOut').forEach((s, i) => { labels.out[i] = s; });
-  loadParsed({ rules, labels, skipped: 0 }, 'fallback-example.json');
+  loadParsed({ groups, labels: { in: { ...t('example.labelsIn') }, out: { ...t('example.labelsOut') } }, skipped: 0 }, 'fallback-example.json');
   state.dirty = true;
 }
 $('#emptyExample').addEventListener('click', loadExample);
@@ -1279,7 +1514,7 @@ function cleanName(n) {
   return s;
 }
 function download() {
-  if (!state.rules.length) { toast(t('err.empty')); return; }
+  if (!state.groups.length) { toast(t('err.empty')); return; }
   if (lastIssues.some((i) => i.level === 'error')) { toast(t('err.fix')); return; }
   const name = cleanName(state.fileName);
   const blob = new Blob([currentText()], { type: 'application/json' });
@@ -1332,7 +1567,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   else if (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
 });
-window.addEventListener('beforeunload', (e) => { if (state.dirty && state.rules.length) { e.preventDefault(); e.returnValue = t('leave'); } });
+window.addEventListener('beforeunload', (e) => { if (state.dirty && state.groups.length) { e.preventDefault(); e.returnValue = t('leave'); } });
 
 /* ---------- language ---------- */
 $('#langBtn').addEventListener('click', () => {
@@ -1345,14 +1580,14 @@ $('#langBtn').addEventListener('click', () => {
 
 /* ---------- start ---------- */
 (function init() {
-  const raw = store.get('logicasa.fallback.draft');
   let restored = false;
+  const raw = store.get('logicasa.fallback.draft2');
   if (raw) {
     try {
       const d = JSON.parse(raw);
       const hasLabels = d.labels && (Object.keys(d.labels.in || {}).length || Object.keys(d.labels.out || {}).length);
-      if ((d.rules && d.rules.length) || hasLabels) {
-        state.rules = (d.rules || []).map((r) => newRule(r));
+      if ((d.groups && d.groups.length) || hasLabels) {
+        state.groups = (d.groups || []).map((g) => newGroup(g));
         state.labels = { in: (d.labels && d.labels.in) || {}, out: (d.labels && d.labels.out) || {} };
         state.fileName = d.fileName || state.fileName;
         state.includeLabels = d.includeLabels !== false;
@@ -1363,7 +1598,7 @@ $('#langBtn').addEventListener('click', () => {
   }
   applyI18n();
   showTab('rules');
-  if (restored) toast(t('restored'), { label: t('startover'), fn: () => { mutate(() => { state.rules = []; state.labels = { in: {}, out: {} }; }); state.dirty = false; } });
+  if (restored) toast(t('restored'), { label: t('startover'), fn: () => { mutate(() => { state.groups = []; state.labels = { in: {}, out: {} }; }); state.dirty = false; } });
 })();
 
 })();

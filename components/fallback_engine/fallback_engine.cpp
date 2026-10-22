@@ -21,6 +21,7 @@ static const char *const TRIGGER_NAMES[] = {"both", "rising", "falling"};
 static const char *const ACTION_NAMES[] = {"toggle", "on", "off", "on_for", "off_for"};
 static const size_t MAX_RULES = 256;
 static const size_t MAX_BODY = 32768;
+static const size_t MAX_META = 16384;  // names / rule layout stored next to the rules
 static const uint32_t DEBOUNCE_MS = 30;
 static const size_t PASS_MIN = 8, PASS_MAX = 64;
 
@@ -176,6 +177,7 @@ void FallbackEngine::setup() {
   this->timer_end_.assign(this->outputs_.size(), 0);
 
   this->load_rules_();
+  this->load_meta_();
   this->load_password_();
 }
 
@@ -216,6 +218,34 @@ void FallbackEngine::load_rules_() {
   }
   this->rules_ = std::move(tmp);
   ESP_LOGI(TAG, "%u fallback rules loaded", (unsigned) this->rules_.size());
+}
+
+void FallbackEngine::load_meta_() {
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) return;
+  size_t len = 0;
+  if (nvs_get_blob(h, "meta", nullptr, &len) == ESP_OK && len > 2 && len <= MAX_META) {
+    std::string s(len, '\0');
+    if (nvs_get_blob(h, "meta", &s[0], &len) == ESP_OK) {
+      s.resize(len);
+      this->meta_ = s;
+    }
+  }
+  nvs_close(h);
+}
+
+bool FallbackEngine::save_meta_(const std::string &meta) {
+  nvs_handle_t h;
+  if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) return false;
+  esp_err_t e = ESP_OK;
+  if (meta.empty()) {
+    nvs_erase_key(h, "meta");  // ESP_ERR_NVS_NOT_FOUND is fine
+  } else {
+    e = nvs_set_blob(h, "meta", meta.data(), meta.size());
+  }
+  if (e == ESP_OK) e = nvs_commit(h);
+  nvs_close(h);
+  return e == ESP_OK;
 }
 
 bool FallbackEngine::save_rules_(const std::vector<Rule> &rules) {
@@ -282,9 +312,11 @@ void FallbackEngine::reset_password() {
 void FallbackEngine::clear_rules() {
   std::vector<Rule> empty;
   this->save_rules_(empty);
+  this->save_meta_("");
   {
     std::lock_guard<std::mutex> lk(this->mutex_);
     this->rules_.clear();
+    this->meta_.clear();
     this->cancel_timers_();
   }
   ESP_LOGW(TAG, "Fallback rules cleared");
@@ -292,7 +324,7 @@ void FallbackEngine::clear_rules() {
 
 // ---------------------------------------------------------------- JSON
 
-bool FallbackEngine::parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err) {
+bool FallbackEngine::parse_config_(const std::string &body, std::vector<Rule> &out, std::string &meta, std::string &err) {
   err = "invalid JSON";
   bool ok = json::parse_json(body, [&](JsonObject root) -> bool {
     if ((int) (root["version"] | 0) != 1) {
@@ -347,6 +379,10 @@ bool FallbackEngine::parse_config_(const std::string &body, std::vector<Rule> &o
       rule.seconds = (ai == ACT_ON_FOR || ai == ACT_OFF_FOR) ? sec : 0;
       out.push_back(rule);
     }
+    // Keep everything else in the file (names, groups, ...) verbatim, so it can be downloaded again.
+    root.remove("version");
+    root.remove("rules");
+    if (root.size() > 0) serializeJson(root, meta);
     return true;
   });
   return ok;
@@ -364,7 +400,12 @@ std::string FallbackEngine::rules_to_json_() {
              TRIGGER_NAMES[r.trigger % 3], r.out, ACTION_NAMES[r.action % 5], sec);
     s += buf;
   }
-  s += "]}";
+  s += "]";
+  if (this->meta_.size() > 2) {  // meta_ is a JSON object: splice its members in
+    s += ",";
+    s.append(this->meta_, 1, this->meta_.size() - 2);
+  }
+  s += "}";
   return s;
 }
 
@@ -478,20 +519,28 @@ esp_err_t FallbackEngine::on_upload_(httpd_req_t *req) {
     return send_(req, "400 Bad Request", "text/plain", "Empty or too large upload");
   }
   std::vector<Rule> parsed;
-  std::string err;
-  if (!this->parse_config_(body, parsed, err)) {
+  std::string err, meta;
+  if (!this->parse_config_(body, parsed, meta, err)) {
     return send_(req, "400 Bad Request", "text/plain", "Rejected: " + err);
   }
   if (!this->save_rules_(parsed)) {
     return send_(req, "500 Internal Server Error", "text/plain", "Saving to NVS failed");
   }
+  bool meta_dropped = false;
+  if (meta.size() > MAX_META) {
+    meta.clear();
+    meta_dropped = true;
+  }
+  if (!this->save_meta_(meta)) meta.clear();
   {
     std::lock_guard<std::mutex> lk(this->mutex_);
     this->rules_ = parsed;
+    this->meta_ = meta;
     this->cancel_timers_();
   }
-  char buf[64];
-  snprintf(buf, sizeof buf, "OK: %u rules saved", (unsigned) parsed.size());
+  char buf[128];
+  snprintf(buf, sizeof buf, "OK: %u rules saved%s", (unsigned) parsed.size(),
+           meta_dropped ? " (names and layout were too large and not stored)" : "");
   ESP_LOGI(TAG, "%s", buf);
   return send_(req, "200 OK", "text/plain", buf);
 }

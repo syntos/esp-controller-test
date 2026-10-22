@@ -149,6 +149,23 @@ A fallback file is a small JSON file. Every **rule** connects one **input** to o
 
 You can have **up to 256 rules**. One input may have several rules, so a single button can control several outputs.
 
+#### Names and rule groups (optional)
+
+The visual editor lets you give inputs, outputs and rules a name, and lets one rule use several inputs and several outputs. The file then contains two extra top-level sections next to `rules`:
+
+```json
+{
+  "version": 1,
+  "rules": [ ... ],
+  "groups": [
+    { "name": "Kitchen light", "in": [1, 7], "trigger": "rising", "out": [1], "action": "toggle" }
+  ],
+  "labels": { "in": { "1": "Kitchen switch" }, "out": { "1": "Kitchen" } }
+}
+```
+
+The controller only ever acts on `rules` (every input and output pair of a group becomes one entry there, so the 256 limit counts these entries). `groups` and `labels` are only used by the editor. The controller stores them next to the rules (up to 16 KB) and returns them with **Download current configuration**, so you can edit your setup from any computer.
+
 > **Easiest way:** build the file visually with the [Fallback editor](https://syntos.github.io/esp-controller-test/). Pick inputs and outputs, test the rules in the built-in simulator, and download the file. You can also open an existing file to change it.
 
 ### Example

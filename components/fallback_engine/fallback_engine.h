@@ -52,12 +52,14 @@ class FallbackEngine : public Component {
  protected:
   // NVS
   void load_rules_();
+  void load_meta_();
+  bool save_meta_(const std::string &meta);
   bool save_rules_(const std::vector<Rule> &rules);
   void load_password_();
   bool save_password_(const std::string &pw);
 
   // JSON
-  bool parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err);
+  bool parse_config_(const std::string &body, std::vector<Rule> &out, std::string &meta, std::string &err);
   std::string rules_to_json_();
 
   // HTTP (runs in esp_http_server's own task -> shared data protected by mutex_)
@@ -91,6 +93,7 @@ class FallbackEngine : public Component {
   std::vector<bool> timer_target_;
   std::vector<uint32_t> timer_end_;
   std::string pass_;
+  std::string meta_;  // everything in the uploaded file except version/rules (names, groups), stored verbatim
 
   std::vector<uint32_t> last_edge_;
 
