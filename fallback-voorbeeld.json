@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "rules": [
+    { "in": 0, "trigger": "both",    "out": 0, "action": "toggle" },
+    { "in": 1, "trigger": "rising",  "out": 1, "action": "toggle" },
+    { "in": 2, "trigger": "rising",  "out": 2, "action": "on_for",  "seconds": 120 },
+    { "in": 2, "trigger": "falling", "out": 3, "action": "off" },
+    { "in": 3, "trigger": "rising",  "out": 4, "action": "off_for", "seconds": 30 }
+  ]
+}

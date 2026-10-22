@@ -1,0 +1,1086 @@
+# ESP-Controller (WT32-ETH01, 48 ingangen / 32 uitgangen) - publiek pakket.
+# Bevat GEEN geheimen: API-sleutel, OTA-wachtwoord en dergelijke komen in de
+# persoonlijke wrapper van de klant (zie example/klant-config.yaml) of worden
+# door het ESPHome-dashboard aangemaakt bij het adopteren.
+
+substitutions:
+  device_name: logicasa
+  friendly_name: LogiCasa Controller
+  prefix: esp
+  # Waar deze repository staat (pas aan bij de definitieve repo)
+  repo_user: syntos
+  repo_name: esp-controller-test
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  project:
+    name: logicasa.esp-controller
+    version: "1.0"
+  on_boot:
+    priority: 600
+    then:
+      - light.turn_on:
+          id: statusled
+          green: 0.0
+          red: 1.0
+          blue: 0.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Klanten adopteren het apparaat in de ESPHome Device Builder. Het dashboard maakt dan
+# een kleine eigen config met een eigen API-sleutel en verwijst naar dit bestand.
+dashboard_import:
+  package_import_url: github://${repo_user}/${repo_name}/esp-controller.yaml@main
+  import_full_config: false
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/${repo_user}/${repo_name}
+      ref: main
+      refresh: 1d
+    components: [fallback_engine]
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO0_IN
+  phy_addr: 1
+  power_pin: GPIO16
+
+logger:
+  level: WARN
+
+# Geen encryptiesleutel hier: die staat in de wrapper van de klant.
+# reboot_timeout: 0s voorkomt dat de controller herstart als HA lang weg is.
+api:
+  reboot_timeout: 0s
+  on_client_connected:
+    - light.turn_on:
+        id: statusled
+        green: 0.0
+        red: 0.0
+        blue: 1.0
+  on_client_disconnected:
+    - light.turn_on:
+        id: statusled
+        flash_length: 500ms
+        green: 0.0
+        red: 1.0
+        blue: 1.0
+
+ota:
+  - platform: esphome
+
+i2c:
+  sda: 32
+  scl: 33
+  scan: true
+
+mcp23017:
+  - id: "mcp1"
+    address: 0x20
+  - id: "mcp2"
+    address: 0x21
+  - id: "mcp3"
+    address: 0x22
+  - id: "mcp4"
+    address: 0x23
+  - id: "mcp5"
+    address: 0x24
+
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: ESP IP Address
+    mac_address:
+      name: ESP MAC Address
+
+binary_sensor:
+  - platform: gpio
+    name: "${prefix}_INPUT_01"
+    id: ${prefix}_INPUT_01
+    pin:
+      mcp23xxx: mcp1
+      number: 8
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_02"
+    id: ${prefix}_INPUT_02
+    pin:
+      mcp23xxx: mcp1
+      number: 9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_03"
+    id: ${prefix}_INPUT_03
+    pin:
+      mcp23xxx: mcp1
+      number: 10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_04"
+    id: ${prefix}_INPUT_04
+    pin:
+      mcp23xxx: mcp1
+      number: 11
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_05"
+    id: ${prefix}_INPUT_05
+    pin:
+      mcp23xxx: mcp1
+      number: 12
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_06"
+    id: ${prefix}_INPUT_06
+    pin:
+      mcp23xxx: mcp1
+      number: 13
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_07"
+    id: ${prefix}_INPUT_07
+    pin:
+      mcp23xxx: mcp1
+      number: 14
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_08"
+    id: ${prefix}_INPUT_08
+    pin:
+      mcp23xxx: mcp1
+      number: 15
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_09"
+    id: ${prefix}_INPUT_09
+    pin:
+      mcp23xxx: mcp1
+      number: 7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_10"
+    id: ${prefix}_INPUT_10
+    pin:
+      mcp23xxx: mcp1
+      number: 6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_11"
+    id: ${prefix}_INPUT_11
+    pin:
+      mcp23xxx: mcp1
+      number: 5
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_12"
+    id: ${prefix}_INPUT_12
+    pin:
+      mcp23xxx: mcp1
+      number: 4
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_13"
+    id: ${prefix}_INPUT_13
+    pin:
+      mcp23xxx: mcp1
+      number: 3
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_14"
+    id: ${prefix}_INPUT_14
+    pin:
+      mcp23xxx: mcp1
+      number: 2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_15"
+    id: ${prefix}_INPUT_15
+    pin:
+      mcp23xxx: mcp1
+      number: 1
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_16"
+    id: ${prefix}_INPUT_16
+    pin:
+      mcp23xxx: mcp1
+      number: 0
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_17"
+    id: ${prefix}_INPUT_17
+    pin:
+      mcp23xxx: mcp2
+      number: 0
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_18"
+    id: ${prefix}_INPUT_18
+    pin:
+      mcp23xxx: mcp2
+      number: 1
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_19"
+    id: ${prefix}_INPUT_19
+    pin:
+      mcp23xxx: mcp2
+      number: 2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_20"
+    id: ${prefix}_INPUT_20
+    pin:
+      mcp23xxx: mcp2
+      number: 3
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_21"
+    id: ${prefix}_INPUT_21
+    pin:
+      mcp23xxx: mcp2
+      number: 4
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_22"
+    id: ${prefix}_INPUT_22
+    pin:
+      mcp23xxx: mcp2
+      number: 5
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_23"
+    id: ${prefix}_INPUT_23
+    pin:
+      mcp23xxx: mcp2
+      number: 6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_24"
+    id: ${prefix}_INPUT_24
+    pin:
+      mcp23xxx: mcp2
+      number: 7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_25"
+    id: ${prefix}_INPUT_25
+    pin:
+      mcp23xxx: mcp2
+      number: 8
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_26"
+    id: ${prefix}_INPUT_26
+    pin:
+      mcp23xxx: mcp2
+      number: 9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_27"
+    id: ${prefix}_INPUT_27
+    pin:
+      mcp23xxx: mcp2
+      number: 10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_28"
+    id: ${prefix}_INPUT_28
+    pin:
+      mcp23xxx: mcp2
+      number: 11
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_29"
+    id: ${prefix}_INPUT_29
+    pin:
+      mcp23xxx: mcp2
+      number: 12
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_30"
+    id: ${prefix}_INPUT_30
+    pin:
+      mcp23xxx: mcp2
+      number: 13
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_31"
+    id: ${prefix}_INPUT_31
+    pin:
+      mcp23xxx: mcp2
+      number: 14
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_32"
+    id: ${prefix}_INPUT_32
+    pin:
+      mcp23xxx: mcp2
+      number: 15
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_33"
+    id: ${prefix}_INPUT_33
+    pin:
+      mcp23xxx: mcp3
+      number: 0
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_34"
+    id: ${prefix}_INPUT_34
+    pin:
+      mcp23xxx: mcp3
+      number: 1
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_35"
+    id: ${prefix}_INPUT_35
+    pin:
+      mcp23xxx: mcp3
+      number: 2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_36"
+    id: ${prefix}_INPUT_36
+    pin:
+      mcp23xxx: mcp3
+      number: 3
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_37"
+    id: ${prefix}_INPUT_37
+    pin:
+      mcp23xxx: mcp3
+      number: 4
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_38"
+    id: ${prefix}_INPUT_38
+    pin:
+      mcp23xxx: mcp3
+      number: 5
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_39"
+    id: ${prefix}_INPUT_39
+    pin:
+      mcp23xxx: mcp3
+      number: 6
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_40"
+    id: ${prefix}_INPUT_40
+    pin:
+      mcp23xxx: mcp3
+      number: 7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_41"
+    id: ${prefix}_INPUT_41
+    pin:
+      mcp23xxx: mcp3
+      number: 8
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_42"
+    id: ${prefix}_INPUT_42
+    pin:
+      mcp23xxx: mcp3
+      number: 9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_43"
+    id: ${prefix}_INPUT_43
+    pin:
+      mcp23xxx: mcp3
+      number: 10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_44"
+    id: ${prefix}_INPUT_44
+    pin:
+      mcp23xxx: mcp3
+      number: 11
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_45"
+    id: ${prefix}_INPUT_45
+    pin:
+      mcp23xxx: mcp3
+      number: 12
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_46"
+    id: ${prefix}_INPUT_46
+    pin:
+      mcp23xxx: mcp3
+      number: 13
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_47"
+    id: ${prefix}_INPUT_47
+    pin:
+      mcp23xxx: mcp3
+      number: 14
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+  - platform: gpio
+    name: "${prefix}_INPUT_48"
+    id: ${prefix}_INPUT_48
+    pin:
+      mcp23xxx: mcp3
+      number: 15
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+light:
+  - platform: neopixelbus
+    variant: WS2812X
+    pin: 4
+    num_leds: 1
+    name: "Status LED"
+    id: statusled
+    icon: "mdi:led-outline"
+
+  - platform: binary
+    name: "${prefix}_CHANNEL_01"
+    id: ch_01
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A1
+  - platform: binary
+    name: "${prefix}_CHANNEL_02"
+    id: ch_02
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A2
+  - platform: binary
+    name: "${prefix}_CHANNEL_03"
+    id: ch_03
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A3
+  - platform: binary
+    name: "${prefix}_CHANNEL_04"
+    id: ch_04
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A4
+  - platform: binary
+    name: "${prefix}_CHANNEL_05"
+    id: ch_05
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A5
+  - platform: binary
+    name: "${prefix}_CHANNEL_06"
+    id: ch_06
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A6
+  - platform: binary
+    name: "${prefix}_CHANNEL_07"
+    id: ch_07
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A7
+  - platform: binary
+    name: "${prefix}_CHANNEL_08"
+    id: ch_08
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A8
+  - platform: binary
+    name: "${prefix}_CHANNEL_09"
+    id: ch_09
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A9
+  - platform: binary
+    name: "${prefix}_CHANNEL_10"
+    id: ch_10
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A10
+  - platform: binary
+    name: "${prefix}_CHANNEL_11"
+    id: ch_11
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A11
+  - platform: binary
+    name: "${prefix}_CHANNEL_12"
+    id: ch_12
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A12
+  - platform: binary
+    name: "${prefix}_CHANNEL_13"
+    id: ch_13
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A13
+  - platform: binary
+    name: "${prefix}_CHANNEL_14"
+    id: ch_14
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A14
+  - platform: binary
+    name: "${prefix}_CHANNEL_15"
+    id: ch_15
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A15
+  - platform: binary
+    name: "${prefix}_CHANNEL_16"
+    id: ch_16
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_A16
+  - platform: binary
+    name: "${prefix}_CHANNEL_17"
+    id: ch_17
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B1
+  - platform: binary
+    name: "${prefix}_CHANNEL_18"
+    id: ch_18
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B2
+  - platform: binary
+    name: "${prefix}_CHANNEL_19"
+    id: ch_19
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B3
+  - platform: binary
+    name: "${prefix}_CHANNEL_20"
+    id: ch_20
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B4
+  - platform: binary
+    name: "${prefix}_CHANNEL_21"
+    id: ch_21
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B5
+  - platform: binary
+    name: "${prefix}_CHANNEL_22"
+    id: ch_22
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B6
+  - platform: binary
+    name: "${prefix}_CHANNEL_23"
+    id: ch_23
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B7
+  - platform: binary
+    name: "${prefix}_CHANNEL_24"
+    id: ch_24
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B8
+  - platform: binary
+    name: "${prefix}_CHANNEL_25"
+    id: ch_25
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B9
+  - platform: binary
+    name: "${prefix}_CHANNEL_26"
+    id: ch_26
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B10
+  - platform: binary
+    name: "${prefix}_CHANNEL_27"
+    id: ch_27
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B11
+  - platform: binary
+    name: "${prefix}_CHANNEL_28"
+    id: ch_28
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B12
+  - platform: binary
+    name: "${prefix}_CHANNEL_29"
+    id: ch_29
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B13
+  - platform: binary
+    name: "${prefix}_CHANNEL_30"
+    id: ch_30
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B14
+  - platform: binary
+    name: "${prefix}_CHANNEL_31"
+    id: ch_31
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B15
+  - platform: binary
+    name: "${prefix}_CHANNEL_32"
+    id: ch_32
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: RO_B16
+
+output:
+  - id: RO_A1
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 15
+      mode:
+        output: true
+  - id: RO_A2
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 14
+      mode:
+        output: true
+  - id: RO_A3
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 13
+      mode:
+        output: true
+  - id: RO_A4
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 12
+      mode:
+        output: true
+  - id: RO_A5
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 11
+      mode:
+        output: true
+  - id: RO_A6
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 10
+      mode:
+        output: true
+  - id: RO_A7
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 9
+      mode:
+        output: true
+  - id: RO_A8
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 8
+      mode:
+        output: true
+  - id: RO_A9
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 7
+      mode:
+        output: true
+  - id: RO_A10
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 6
+      mode:
+        output: true
+  - id: RO_A11
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 5
+      mode:
+        output: true
+  - id: RO_A12
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 4
+      mode:
+        output: true
+  - id: RO_A13
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 3
+      mode:
+        output: true
+  - id: RO_A14
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 2
+      mode:
+        output: true
+  - id: RO_A15
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 1
+      mode:
+        output: true
+  - id: RO_A16
+    platform: gpio
+    pin:
+      mcp23xxx: mcp4
+      number: 0
+      mode:
+        output: true
+  - id: RO_B1
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 15
+      mode:
+        output: true
+  - id: RO_B2
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 14
+      mode:
+        output: true
+  - id: RO_B3
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 13
+      mode:
+        output: true
+  - id: RO_B4
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 12
+      mode:
+        output: true
+  - id: RO_B5
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 11
+      mode:
+        output: true
+  - id: RO_B6
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 10
+      mode:
+        output: true
+  - id: RO_B7
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 9
+      mode:
+        output: true
+  - id: RO_B8
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 8
+      mode:
+        output: true
+  - id: RO_B9
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 7
+      mode:
+        output: true
+  - id: RO_B10
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 6
+      mode:
+        output: true
+  - id: RO_B11
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 5
+      mode:
+        output: true
+  - id: RO_B12
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 4
+      mode:
+        output: true
+  - id: RO_B13
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 3
+      mode:
+        output: true
+  - id: RO_B14
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 2
+      mode:
+        output: true
+  - id: RO_B15
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 1
+      mode:
+        output: true
+  - id: RO_B16
+    platform: gpio
+    pin:
+      mcp23xxx: mcp5
+      number: 0
+      mode:
+        output: true
+
+switch:
+  - platform: restart
+    id: "${prefix}_reboot"
+    name: "Reboot ${prefix}"
+
+# Knop in Home Assistant om het wachtwoord van de fallback-pagina te resetten
+button:
+  - platform: template
+    name: "Reset fallback-wachtwoord"
+    entity_category: config
+    on_press:
+      - lambda: id(fallback).reset_password();
+
+# Noodmodus. De volgorde van de lijsten bepaalt het nummer in het fallback-bestand:
+# inputs[0] = ${prefix}_INPUT_01 = "in": 0     outputs[0] = ch_01 = "out": 0
+fallback_engine:
+  id: fallback
+  disconnect_delay: 15s
+  reconnect_delay: 10s
+  # Optioneel: een DRUKKNOP-ingang om het wachtwoord fysiek te resetten
+  # (10 s ingedrukt houden binnen 60 s na het opstarten). Kies geen schakelaar.
+  # reset_input: ${prefix}_INPUT_48
+  inputs:
+    - ${prefix}_INPUT_01
+    - ${prefix}_INPUT_02
+    - ${prefix}_INPUT_03
+    - ${prefix}_INPUT_04
+    - ${prefix}_INPUT_05
+    - ${prefix}_INPUT_06
+    - ${prefix}_INPUT_07
+    - ${prefix}_INPUT_08
+    - ${prefix}_INPUT_09
+    - ${prefix}_INPUT_10
+    - ${prefix}_INPUT_11
+    - ${prefix}_INPUT_12
+    - ${prefix}_INPUT_13
+    - ${prefix}_INPUT_14
+    - ${prefix}_INPUT_15
+    - ${prefix}_INPUT_16
+    - ${prefix}_INPUT_17
+    - ${prefix}_INPUT_18
+    - ${prefix}_INPUT_19
+    - ${prefix}_INPUT_20
+    - ${prefix}_INPUT_21
+    - ${prefix}_INPUT_22
+    - ${prefix}_INPUT_23
+    - ${prefix}_INPUT_24
+    - ${prefix}_INPUT_25
+    - ${prefix}_INPUT_26
+    - ${prefix}_INPUT_27
+    - ${prefix}_INPUT_28
+    - ${prefix}_INPUT_29
+    - ${prefix}_INPUT_30
+    - ${prefix}_INPUT_31
+    - ${prefix}_INPUT_32
+    - ${prefix}_INPUT_33
+    - ${prefix}_INPUT_34
+    - ${prefix}_INPUT_35
+    - ${prefix}_INPUT_36
+    - ${prefix}_INPUT_37
+    - ${prefix}_INPUT_38
+    - ${prefix}_INPUT_39
+    - ${prefix}_INPUT_40
+    - ${prefix}_INPUT_41
+    - ${prefix}_INPUT_42
+    - ${prefix}_INPUT_43
+    - ${prefix}_INPUT_44
+    - ${prefix}_INPUT_45
+    - ${prefix}_INPUT_46
+    - ${prefix}_INPUT_47
+    - ${prefix}_INPUT_48
+  outputs:
+    - ch_01
+    - ch_02
+    - ch_03
+    - ch_04
+    - ch_05
+    - ch_06
+    - ch_07
+    - ch_08
+    - ch_09
+    - ch_10
+    - ch_11
+    - ch_12
+    - ch_13
+    - ch_14
+    - ch_15
+    - ch_16
+    - ch_17
+    - ch_18
+    - ch_19
+    - ch_20
+    - ch_21
+    - ch_22
+    - ch_23
+    - ch_24
+    - ch_25
+    - ch_26
+    - ch_27
+    - ch_28
+    - ch_29
+    - ch_30
+    - ch_31
+    - ch_32

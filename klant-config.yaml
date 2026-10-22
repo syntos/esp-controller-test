@@ -1,0 +1,21 @@
+# Persoonlijke config van de klant. Normaal maakt de ESPHome Device Builder dit
+# automatisch aan wanneer je het apparaat "adopteert" (met een eigen API-sleutel).
+# Handmatig kan het zo:
+
+substitutions:
+  device_name: logicasa
+
+packages:
+  logicasa:
+    url: https://github.com/JOUW-GEBRUIKERSNAAM/esp-controller-test
+    ref: main
+    file: esp-controller.yaml
+    refresh: 1d
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
