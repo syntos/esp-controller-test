@@ -1,15 +1,10 @@
-# Logi.casa ESP Home Controller (WT32-ETH01, 48 inputs / 32 outputs) - public package.
-# Contains NO secrets: API key, OTA password and the like live in the customer's
-# personal wrapper (see example/customer-config.yaml) or are created by the
-# ESPHome dashboard when the device is adopted.
+# Shared hardware definition for both variants (Ethernet and WiFi).
+# Edit this file, then run: python tools/build_yaml.py
 
 substitutions:
-  device_name: logicasa
   friendly_name: LogiCasa Controller
   prefix: esp
-  # Where this repository lives (change to the final repo when you publish)
-  repo_user: syntos
-  repo_name: esp-controller-test
+
 
 esphome:
   name: ${device_name}
@@ -17,7 +12,7 @@ esphome:
   name_add_mac_suffix: true
   project:
     name: logicasa.esp-controller
-    version: "1.0"
+    version: "${project_version}"
   on_boot:
     priority: 600
     then:
@@ -32,36 +27,16 @@ esp32:
   framework:
     type: arduino
 
-# Customers adopt the device in the ESPHome Device Builder. The dashboard then creates
-# a small personal config with its own API key that points to this file.
-dashboard_import:
-  package_import_url: github://${repo_user}/${repo_name}/esp-controller.yaml@main
-  import_full_config: false
-
-external_components:
-  - source:
-      type: git
-      url: https://github.com/${repo_user}/${repo_name}
-      ref: main
-    refresh: always
-    components: [fallback_engine]
-
-ethernet:
-  type: LAN8720
-  mdc_pin: GPIO23
-  mdio_pin: GPIO18
-  clk:
-    mode: CLK_EXT_IN
-    pin: 0
-  phy_addr: 1
-  power_pin: GPIO16
-
 logger:
   level: WARN
 
-# Geen encryptiesleutel hier: die staat in de wrapper van de klant.
-# reboot_timeout: 0s voorkomt dat de controller herstart als HA lang weg is.
+# The API key below is a PUBLIC factory key, only used until you "Take Control" of the
+# controller in ESPHome Builder. That step generates your own private key.
+# reboot_timeout: 0s stops the controller from restarting when Home Assistant is away
+# for a long time, so the offline fallback keeps working.
 api:
+  encryption:
+    key: "${factory_api_key}"
   reboot_timeout: 0s
   on_client_connected:
     - light.turn_on:
@@ -70,13 +45,13 @@ api:
         red: 0.0
         blue: 1.0
   on_client_disconnected:
-    # Paars: verbinding met Home Assistant weg
+    # Purple: connection to Home Assistant lost
     - light.turn_on:
         id: statusled
         green: 0.0
         red: 1.0
         blue: 1.0
-    # Oranje: nog steeds weg na de wachttijd van de fallback (= disconnect_delay, 15 s)
+    # Orange: still gone after the fallback delay (= disconnect_delay, 15 s)
     - delay: 15s
     - if:
         condition:
@@ -108,13 +83,6 @@ mcp23017:
     address: 0x23
   - id: "mcp5"
     address: 0x24
-
-text_sensor:
-  - platform: ethernet_info
-    ip_address:
-      name: ESP IP Address
-    mac_address:
-      name: ESP MAC Address
 
 binary_sensor:
   - platform: gpio
@@ -1021,11 +989,11 @@ fallback_engine:
   disconnect_delay: 15s
   reconnect_delay: 10s
   # Optional: a PUSH-BUTTON input to reset the fallback page password without Home
-  # Assistant. Press it within 60 s after power-up and hold it for 10 s. The status LED blinks white while you
-  # hold and turns steady green when the password is reset: release the button then.
-  # A button that is already held down
-  # at power-up is ignored. Pick a push button, not a wall switch, and do not
-  # use this input in fallback rules.
+  # Assistant. Press it within 60 s after power-up and hold it for 10 s. The status
+  # LED blinks white while you hold and turns steady green when the password has been
+  # reset: release the button then. A button that is already held down at power-up is
+  # ignored. Use a push button, not a wall switch, and do not use this input in
+  # fallback rules.
   reset_input: ${prefix}_INPUT_48
   status_light: statusled
   inputs:

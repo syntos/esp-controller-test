@@ -1,23 +1,27 @@
-# Personal customer config. Normally the ESPHome Device Builder creates this for you
-# when you "adopt" the device (with your own API key).
-# To do it by hand:
+# Personal configuration of a controller. Normally ESPHome Builder creates this for you
+# when you click "Take Control" (with your own API key). To do it by hand:
 
 substitutions:
-  device_name: logicasa
+  device_name: logicasa          # use "logicasa-wifi" for the WiFi variant
 
 packages:
   logicasa:
     url: https://github.com/syntos/esp-controller-test
-    ref: main
-    file: esp-controller.yaml
+    ref: main                    # production: a release tag, for example v1.0.0
+    file: esp-controller-ethernet.yaml   # or esp-controller-wifi.yaml
     refresh: 1d
 
 api:
   encryption:
-    key: !secret api_key
+    key: !secret api_key         # your own key, see secrets.yaml.example
 
 # OTA updates use the same key as the API (ESPHome 2026.9 or newer).
 # Do not add "password:" next to "encryption:"; they cannot be combined.
 ota:
   - platform: esphome
     encryption:
+
+# Optional: the controller's address, if ESPHome Builder cannot find it by name
+# (the controller announces itself as <device_name>-<last 6 characters of its MAC address>).
+# ethernet:
+#   use_address: 192.168.1.50

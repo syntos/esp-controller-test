@@ -1,0 +1,38 @@
+# WiFi variant. Same hardware and entities, but connects over WiFi instead of Ethernet.
+
+substitutions:
+  device_name: logicasa-wifi
+
+wifi:
+  # Fallback hotspot, used when the controller cannot connect to a network
+  ap:
+    password: "LogiCasa"
+
+# Together with the hotspot, this lets the user enter WiFi credentials in a browser.
+captive_portal:
+
+# Lets the user enter WiFi credentials right after flashing, over the USB cable.
+improv_serial:
+  next_url: https://www.logi.casa
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ESP IP Address
+    mac_address:
+      name: ESP MAC Address
+
+sensor:
+  - platform: wifi_signal
+    name: "${prefix}_WiFi Signal dB"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: diagnostic
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "${prefix}_WiFi Signal"
+    id: wifi_signal_pct
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: diagnostic

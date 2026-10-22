@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "rules": [
+    { "in": 0, "trigger": "both",    "out": 0, "action": "toggle" },
+
+    { "in": 1, "trigger": "rising",  "out": 1, "action": "toggle" },
+
+    { "in": 2, "trigger": "rising",  "out": 2, "action": "on" },
+    { "in": 2, "trigger": "falling", "out": 2, "action": "off" },
+
+    { "in": 3, "trigger": "rising",  "out": 3, "action": "on_for",  "seconds": 10 },
+
+    { "in": 4, "trigger": "rising",  "out": 4, "action": "off_for", "seconds": 10 },
+
+    { "in": 5, "trigger": "rising",  "out": 0, "action": "off" },
+    { "in": 5, "trigger": "rising",  "out": 1, "action": "off" },
+    { "in": 5, "trigger": "rising",  "out": 2, "action": "off" },
+    { "in": 5, "trigger": "rising",  "out": 3, "action": "off" },
+
+    { "in": 6, "trigger": "falling", "out": 6, "action": "toggle" }
+  ]
+}

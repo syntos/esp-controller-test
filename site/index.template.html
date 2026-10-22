@@ -1,0 +1,1763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#4EC3E0">
+<meta name="description" content="Build the offline fallback rules for your Logi.casa ESP Home Controller: choose which input switches which output, then download the file.">
+<title>Fallback editor – Logi.casa</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,__FAVICON__">
+<style>
+:root{
+  --blue:#4EC3E0; --green:#00965E;
+  --blue-strong:#0A7B97; --green-strong:#00784B; --on-strong:#fff;
+  --blue-ink:#0A7B97; --green-ink:#007A4D;
+  --blue-tint:#E7F6FA; --green-tint:#E5F5EE;
+  --ink:#10303A; --ink-2:#4A6770; --line:#D5E4EA; --bg:#F2F8FA; --surface:#fff;
+  --warn:#8A5300; --warn-tint:#FFF3DC; --err:#B42525; --err-tint:#FDEAEA;
+  --shadow:0 1px 2px rgba(16,48,58,.06),0 6px 20px rgba(16,48,58,.05);
+  --radius:18px;
+  --font:"Futura","Futura PT","Century Gothic","Avenir Next","Avenir","Trebuchet MS",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --blue-strong:#4EC3E0; --green-strong:#2FBF86; --on-strong:#04222B;
+    --blue-ink:#7FD6EC; --green-ink:#5BD8A6;
+    --blue-tint:#0F2E38; --green-tint:#0B2D24;
+    --ink:#E7F4F7; --ink-2:#9CB8C1; --line:#25444D; --bg:#0A171C; --surface:#10252C;
+    --warn:#F2B654; --warn-tint:#33260C; --err:#FF8E8E; --err-tint:#3A1616;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.5}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{line-height:1.15;letter-spacing:-.01em}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--blue-ink)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+.ic{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:8px}
+
+/* header */
+.top{position:sticky;top:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:8px;min-height:68px}
+.brand{display:flex;align-items:center;gap:12px;margin-right:auto;text-decoration:none}
+.brand .mark{height:40px;width:auto;display:block}
+.brand .word{height:21px;width:auto;display:block}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 15px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:600;cursor:pointer;text-decoration:none;transition:border-color .15s,background-color .15s}
+.btn:hover{border-color:var(--blue)}
+.btn.primary{background:var(--green-strong);border-color:var(--green-strong);color:var(--on-strong)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn[disabled],.btn[aria-disabled=true]{opacity:.45;cursor:not-allowed;filter:none}
+.btn.small{min-height:34px;padding:0 12px;font-size:.92rem}
+.lang{min-width:46px;padding:0 10px}
+
+/* intro */
+.intro{padding:30px 0 6px}
+.intro h1{font-size:clamp(1.75rem,3.4vw,2.4rem);font-weight:700}
+.intro p{max-width:62ch;color:var(--ink-2);margin-top:8px}
+.steps{display:flex;flex-wrap:wrap;gap:10px 30px;list-style:none;margin:20px 0 0;padding:0;counter-reset:s}
+.steps li{display:flex;align-items:center;gap:10px;font-weight:600}
+.steps li::before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--blue);color:#06303B;font-weight:700;font-size:.92rem}
+.steps li:last-child::before{background:var(--green-strong);color:var(--on-strong)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin:24px 0 18px;border-bottom:1.5px solid var(--line);overflow-x:auto}
+.tab{appearance:none;background:none;border:0;padding:11px 14px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1.5px;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--green)}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--blue-tint);color:var(--blue-ink);font-size:.8rem;margin-left:7px}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.toolbar .grow{flex:1 1 220px;min-width:0}
+.search{position:relative;display:block}
+.search .ic{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-2);pointer-events:none}
+.search input{width:100%;min-height:40px;padding:0 14px 0 38px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface)}
+.count{color:var(--ink-2);font-size:.92rem;margin-left:auto}
+.menu{position:relative}
+.menu summary{list-style:none}
+.menu summary::-webkit-details-marker{display:none}
+.menu-pop{position:absolute;z-index:10;top:calc(100% + 6px);left:0;min-width:300px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px}
+.menu-pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;border-radius:10px;cursor:pointer}
+.menu-pop button:hover{background:var(--bg)}
+
+/* checks */
+.checks{margin-bottom:14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);overflow:hidden}
+.checks.ok{display:flex;align-items:center;gap:10px;padding:10px 14px;color:var(--green-ink);font-weight:600}
+.checks summary{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-weight:600}
+.checks.has-err{border-color:var(--err);background:var(--err-tint)}
+.checks.has-warn{border-color:#E0B25A;background:var(--warn-tint)}
+.checks.has-err summary{color:var(--err)}
+.checks.has-warn summary{color:var(--warn)}
+.checks ul{list-style:none;margin:0;padding:0 14px 12px}
+.checks li button{border:0;background:none;padding:5px 0;text-align:left;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+
+/* rule cards */
+.rules{display:grid;gap:14px}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px 14px;display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);box-shadow:var(--shadow)}
+.rule.flash{animation:flash 1.2s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 4px var(--blue)}100%{box-shadow:var(--shadow)}}
+.rule-top{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rule-n{font-weight:700;color:var(--ink-2);font-size:.95rem;padding-left:4px}
+.tools{display:flex;gap:2px}
+.icon-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:0;background:none;color:var(--ink-2);cursor:pointer}
+.icon-btn:hover{background:var(--bg);color:var(--ink)}
+.half{border-radius:14px;padding:12px 14px 15px;border-left:7px solid;display:flex;flex-direction:column;gap:11px;min-width:0}
+.half.in{background:var(--blue-tint);border-color:var(--blue)}
+.half.out{background:var(--green-tint);border-color:var(--green)}
+.half-h{font-weight:700;color:var(--blue-ink)}
+.half.out .half-h{color:var(--green-ink)}
+.link{display:grid;place-items:center;color:var(--ink-2)}
+.link .ic{width:1.6em;height:1.6em}
+.pick{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;text-align:left}
+.in .pick:hover{border-color:var(--blue)}
+.out .pick:hover{border-color:var(--green)}
+.pick-text{display:flex;flex-direction:column;min-width:0}
+.pick-text b{font-size:1.05rem}
+.pick-text small{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font-size:.93rem;font-weight:600;line-height:1.2}
+.in .seg-btn:hover{border-color:var(--blue)}
+.out .seg-btn:hover{border-color:var(--green)}
+.in .seg-btn[aria-pressed=true]{background:var(--blue-strong);border-color:var(--blue-strong);color:var(--on-strong)}
+.out .seg-btn[aria-pressed=true]{background:var(--green-strong);border-color:var(--green-strong);color:var(--on-strong)}
+.hint{color:var(--ink-2);font-size:.9rem;max-width:46ch}
+.dur{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dur label{display:flex;align-items:center;gap:8px;font-weight:600}
+.dur input,.dur select{min-height:40px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);padding:0 10px}
+.dur input{width:96px}
+@media(max-width:760px){
+  .rule{grid-template-columns:minmax(0,1fr)}
+  .link{height:34px}
+  .link .ic{transform:rotate(90deg)}
+}
+
+/* empty */
+.empty{display:grid;justify-items:center;gap:14px;text-align:center;padding:54px 16px;border:2px dashed var(--line);border-radius:var(--radius);background:var(--surface)}
+.empty img{height:84px;width:auto;opacity:.9}
+.empty h2{font-size:1.4rem}
+.empty p{color:var(--ink-2);max-width:42ch}
+.empty .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
+
+/* panels (names/file/test) */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.panel h2{font-size:1.25rem;margin-bottom:6px}
+.panel > p{color:var(--ink-2);max-width:64ch}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.col{border-radius:14px;padding:14px;border-left:7px solid}
+.col.in{background:var(--blue-tint);border-color:var(--blue)}
+.col.out{background:var(--green-tint);border-color:var(--green)}
+.col h3{font-size:1.05rem;margin-bottom:10px}
+.col.in h3{color:var(--blue-ink)}
+.col.out h3{color:var(--green-ink)}
+
+/* names */
+.name-grid{display:grid;gap:8px}
+.name-row{display:flex;align-items:center;gap:10px}
+.name-n{flex:none;width:34px;text-align:right;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.name-row input{flex:1;min-width:0;min-height:38px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);padding:0 11px}
+.name-row input::placeholder{color:var(--ink-2);opacity:.6}
+
+/* test */
+.sim-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.sim-in{display:flex;gap:6px}
+.sim-btn{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 12px;border-radius:14px;border:2px solid var(--line);background:var(--surface);cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;text-align:left}
+.sim-btn b{display:flex;align-items:center;gap:7px}
+.sim-btn small{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;min-height:1.3em}
+.sim-btn[aria-pressed=true]{background:var(--blue-strong);border-color:var(--blue-strong);color:var(--on-strong)}
+.sim-btn[aria-pressed=true] small{color:inherit;opacity:.85}
+.sim-mode{width:38px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;display:grid;place-items:center}
+.sim-mode[aria-pressed=true]{color:var(--blue-ink);border-color:var(--blue)}
+.lamp{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:14px;border:2px solid var(--line);background:var(--surface);min-height:66px}
+.bulb{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:2px solid var(--line);color:var(--ink-2);transition:background-color .15s,box-shadow .2s}
+.lamp.on{border-color:var(--green)}
+.lamp.on .bulb{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 0 0 6px rgba(0,150,94,.18),0 0 26px rgba(0,150,94,.55)}
+.lamp b{display:block}
+.lamp small{display:block;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lamp .timer{color:var(--green-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.note{color:var(--ink-2);font-size:.9rem;margin-top:14px}
+
+/* file */
+.file-row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:14px 0}
+.field{display:grid;gap:5px;font-weight:600}
+.field input[type=text]{min-height:40px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);padding:0 12px;min-width:220px}
+.check{display:flex;align-items:center;gap:9px;font-weight:600}
+.check input{width:20px;height:20px;accent-color:var(--green-strong)}
+pre.code{margin:0;max-height:440px;overflow:auto;background:#0E252C;color:#DDEFF4;border-radius:14px;padding:16px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2}
+.meta{color:var(--ink-2);font-size:.92rem}
+
+/* dialogs */
+dialog{border:0;border-radius:22px;padding:0;width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:var(--surface);color:var(--ink);box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}
+dialog[open]{display:flex;flex-direction:column}
+dialog::backdrop{background:rgba(6,26,32,.6)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 6px 22px}
+.dlg-head h2{font-size:1.3rem}
+.dlg-body{padding:6px 22px 22px;overflow:auto}
+.dlg-sub{color:var(--ink-2);padding:0 22px 4px}
+#picker.in .dlg-head{border-top:7px solid var(--blue)}
+#picker.out .dlg-head{border-top:7px solid var(--green)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-height:62px;padding:8px 10px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;text-align:left}
+.tile b{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.tile small{color:var(--ink-2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
+.in .tile:hover{border-color:var(--blue)}
+.out .tile:hover{border-color:var(--green)}
+.in .tile[aria-pressed=true]{background:var(--blue-strong);border-color:var(--blue-strong);color:var(--on-strong)}
+.out .tile[aria-pressed=true]{background:var(--green-strong);border-color:var(--green-strong);color:var(--on-strong)}
+.tile[aria-pressed=true] small{color:inherit}
+.tile .used{position:absolute;top:6px;right:7px;font-style:normal;font-size:.72rem;font-weight:700;color:var(--ink-2)}
+.tile[aria-pressed=true] .used{color:inherit}
+.dl-steps{margin:8px 0 0;padding-left:22px;display:grid;gap:14px}
+.ip-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.ip-row input{min-height:42px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);padding:0 12px;width:210px}
+.dlg-actions{display:flex;justify-content:flex-end;margin-top:20px}
+
+/* toast + drop */
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 24px);padding:12px 14px 12px 18px;background:#0E252C;color:#fff;border-radius:14px;box-shadow:0 10px 34px rgba(0,0,0,.35)}
+.toast button{border:0;background:none;color:var(--blue);font-weight:700;cursor:pointer;padding:4px 6px}
+.drop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(78,195,224,.88);color:#04222B;font-size:1.6rem;font-weight:700;text-align:center;padding:20px}
+
+
+/* rule groups */
+.rule-top{gap:10px}
+.rule-name{flex:1;min-width:0;border:0;border-bottom:1.5px dashed var(--line);background:transparent;padding:6px 4px;font-weight:700;font-size:1.05rem;border-radius:0}
+.rule-name:hover{border-bottom-color:var(--blue)}
+.rule-name::placeholder{color:var(--ink-2);opacity:.55;font-weight:500}
+.rule-name:focus-visible{border-radius:6px}
+.expands{color:var(--ink-2);font-size:.85rem;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:3px 4px 3px 11px;font-size:.93rem}
+.chip small{color:var(--ink-2);max-width:13ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{width:24px;height:24px;display:grid;place-items:center;border:0;background:none;border-radius:50%;cursor:pointer;color:var(--ink-2)}
+.chip button .ic{width:.95em;height:.95em}
+.chip button:hover{background:var(--bg);color:var(--ink)}
+.chip.more{padding:5px 11px;cursor:pointer;font-weight:700}
+.in .chip{border-color:var(--blue)}
+.out .chip{border-color:var(--green)}
+.chip-add{min-height:34px}
+#picker{width:min(900px,calc(100vw - 24px))}
+.blk{margin-bottom:16px}
+.blk-h{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.blk-h h3{font-size:1.05rem}
+.blk-r{color:var(--ink-2);font-size:.9rem;margin-right:auto}
+#picker .tiles{grid-template-columns:repeat(8,minmax(0,1fr))}
+#picker .tile{min-height:58px}
+@media(max-width:600px){#picker .tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.pick-foot{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--line);background:var(--surface)}
+.pick-foot .sc{margin-right:auto;font-weight:600}
+.name-blk{margin-bottom:14px}
+.name-blk h4{margin:0 0 8px;font-size:.98rem}
+.name-blk h4 span{color:var(--ink-2);font-weight:400;font-size:.88rem;margin-left:6px}
+
+
+/* site navigation + install page */
+.nav{display:flex;gap:4px;margin-right:4px}
+.nav a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:999px;font-weight:600;text-decoration:none;color:var(--ink-2)}
+.nav a:hover{color:var(--ink)}
+.nav a[aria-current=page]{color:var(--ink);background:var(--green-tint)}
+.actions{display:inline-flex;gap:8px}
+.inst-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;margin:22px 0 16px}
+.install-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;min-height:260px}
+.inst-logo{height:96px;width:auto}
+esp-web-install-button:not(:defined) [slot=unsupported],esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
+.btn.big{min-height:52px;padding:0 26px;font-size:1.08rem}
+.warn-text{color:var(--warn);font-weight:600}
+.next-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.next-item{display:flex;gap:12px;align-items:flex-start;border-radius:14px;padding:14px;border-left:7px solid}
+.next-item.in{background:var(--blue-tint);border-color:var(--blue)}
+.next-item.out{background:var(--green-tint);border-color:var(--green)}
+.next-item p{margin-bottom:10px}
+.next-item > .ic{width:1.6em;height:1.6em;margin-top:2px}
+.variant .seg-btn{padding:12px 16px;font-size:1rem}
+.variant .seg-btn[aria-pressed=true]{background:var(--blue-strong);border-color:var(--blue-strong);color:var(--on-strong)}
+@media(max-width:820px){.inst-grid,.next-grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .top .wrap{flex-wrap:wrap;padding-top:6px;padding-bottom:6px}
+  .nav{order:10;flex-basis:100%;justify-content:center;margin:0}
+}
+
+/* footer */
+.foot{margin-top:46px;padding:26px 0 40px;border-top:1px solid var(--line);color:var(--ink-2);font-size:.92rem}
+.foot .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:14px 28px}
+.foot img{height:56px;width:auto}
+.foot nav{display:flex;flex-wrap:wrap;gap:6px 22px;margin-left:auto}
+
+@media(max-width:640px){
+  .brand .word{display:none}
+  .top .btn .lbl{display:none}
+  .top .btn{padding:0 12px}
+  .count{margin-left:0}
+  .foot nav{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-bulb-on" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" fill="currentColor"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M9.5 3h5"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4"/></symbol>
+    <symbol id="i-switch" viewBox="0 0 24 24"><rect x="2" y="7.5" width="20" height="9" rx="4.5"/><circle cx="16.5" cy="12" r="2.2" fill="currentColor"/></symbol>
+    <symbol id="i-press" viewBox="0 0 24 24"><path d="M12 4v9M8 9.5l4 4 4-4M5 19h14"/></symbol>
+    <symbol id="i-release" viewBox="0 0 24 24"><path d="M12 14V5M8 8.5l4-4 4 4M5 19h14"/></symbol>
+    <symbol id="i-on" viewBox="0 0 24 24"><path d="M12 3v8M7.2 6.6a8 8 0 1 0 9.6 0"/></symbol>
+    <symbol id="i-off" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 6h10M4 12h7M4 18h4M17 5v14M14 16l3 3 3-3"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19L12 3.5zM12 10v4.5M12 17.4v.1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="11" width="13" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/></symbol>
+    <symbol id="i-ethernet" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M8 16v3M12 16v3M16 16v3M8 9v3M12 9v3M16 9v3"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0M12 19.5v.1"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 4v4M12 16v4M4 12h4M16 12h4M7 7l2 2M15 15l2 2M17 7l-2 2M9 15l-2 2"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="https://www.logi.casa" target="_blank" rel="noopener" aria-label="Logi.casa">
+      <img class="mark" src="data:image/png;base64,__ICON__" alt="">
+      <img class="word" src="data:image/png;base64,__WORD__" alt="Logi.casa">
+    </a>
+    <nav class="nav" aria-label="Pages">
+      <a href="#install" id="navInstall" data-i18n="nav.install"></a>
+      <a href="#editor" id="navEditor" data-i18n="nav.editor"></a>
+    </nav>
+    <button class="btn lang" id="langBtn" type="button"></button>
+    <span class="actions" id="editorActions">
+    <button class="btn" id="openBtn" type="button" data-i18n-title="btn.open"><svg class="ic"><use href="#i-open"/></svg><span class="lbl" data-i18n="btn.open"></span></button>
+    <button class="btn" id="newBtn" type="button" data-i18n-title="btn.new"><svg class="ic"><use href="#i-file"/></svg><span class="lbl" data-i18n="btn.new"></span></button>
+    <button class="btn primary" id="dlBtn" type="button" data-i18n-title="btn.download"><svg class="ic"><use href="#i-download"/></svg><span class="lbl" data-i18n="btn.download"></span></button>
+    </span>
+  </div>
+</header>
+
+<main class="wrap" id="page-install">
+  <section class="intro">
+    <h1 data-i18n="inst.title"></h1>
+    <p data-i18n="inst.tag"></p>
+  </section>
+  <div class="inst-grid">
+    <section class="panel">
+      <h2 data-i18n="inst.variant"></h2>
+      <div class="seg variant" role="group" id="variantSeg">
+        <button type="button" class="seg-btn" data-variant="ethernet" aria-pressed="true"><svg class="ic"><use href="#i-ethernet"/></svg><span data-i18n="inst.eth"></span></button>
+        <button type="button" class="seg-btn" data-variant="wifi" aria-pressed="false"><svg class="ic"><use href="#i-wifi"/></svg><span data-i18n="inst.wifi"></span></button>
+      </div>
+      <p class="hint" id="variantHint" style="margin-top:10px"></p>
+      <h2 style="margin-top:22px" data-i18n="inst.prep"></h2>
+      <ol class="dl-steps">
+        <li data-i18n="inst.p1"></li>
+        <li data-i18n="inst.p2"></li>
+        <li data-i18n="inst.p3"></li>
+        <li data-i18n="inst.p4"></li>
+      </ol>
+    </section>
+    <section class="panel install-card">
+      <img class="inst-logo" src="data:image/png;base64,__ICON__" alt="">
+      <p class="meta" id="fwVersion"></p>
+      <esp-web-install-button id="espBtn" manifest="firmware/ethernet/manifest.json">
+        <button slot="activate" type="button" class="btn primary big"><svg class="ic"><use href="#i-chip"/></svg><span data-i18n="inst.btn"></span></button>
+        <span slot="unsupported" class="warn-text" data-i18n="inst.unsupported"></span>
+        <span slot="not-allowed" class="warn-text" data-i18n="inst.notallowed"></span>
+      </esp-web-install-button>
+    </section>
+  </div>
+  <section class="panel next">
+    <h2 data-i18n="inst.next.title"></h2>
+    <div class="next-grid">
+      <div class="next-item in"><svg class="ic"><use href="#i-sparkle"/></svg><div><p data-i18n="inst.next.1"></p><a class="btn small" href="https://www.logi.casa/esp-home-controller-quick-start/" target="_blank" rel="noopener"><span data-i18n="inst.next.guide"></span><svg class="ic"><use href="#i-external"/></svg></a></div></div>
+      <div class="next-item out"><svg class="ic"><use href="#i-bulb"/></svg><div><p data-i18n="inst.next.2"></p><a class="btn small primary" href="#editor"><span data-i18n="inst.next.fallback"></span><svg class="ic"><use href="#i-arrow"/></svg></a></div></div>
+    </div>
+  </section>
+</main>
+
+<main class="wrap" id="page-editor" hidden>
+  <section class="intro">
+    <h1 data-i18n="app.title"></h1>
+    <p data-i18n="app.tag"></p>
+    <ol class="steps">
+      <li data-i18n="step.1"></li>
+      <li data-i18n="step.2"></li>
+      <li data-i18n="step.3"></li>
+    </ol>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="rules" aria-selected="true"><span data-i18n="tab.rules"></span><span class="badge" id="ruleBadge">0</span></button>
+    <button class="tab" role="tab" data-tab="test" aria-selected="false" data-i18n="tab.test"></button>
+    <button class="tab" role="tab" data-tab="names" aria-selected="false" data-i18n="tab.names"></button>
+    <button class="tab" role="tab" data-tab="file" aria-selected="false" data-i18n="tab.file"></button>
+  </div>
+
+  <!-- RULES -->
+  <section id="view-rules" role="tabpanel">
+    <div class="toolbar">
+      <button class="btn primary" id="addBtn" type="button"><svg class="ic"><use href="#i-plus"/></svg><span data-i18n="add.rule"></span></button>
+      <details class="menu" id="presetMenu">
+        <summary class="btn"><svg class="ic"><use href="#i-sparkle"/></svg><span data-i18n="presets"></span><svg class="ic"><use href="#i-chevron"/></svg></summary>
+        <div class="menu-pop" id="presetPop"></div>
+      </details>
+      <label class="search grow"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="search" data-i18n-ph="search.ph" aria-label="Search"></label>
+      <button class="icon-btn" id="sortBtn" type="button" data-i18n-title="sort"><svg class="ic"><use href="#i-sort"/></svg></button>
+      <button class="icon-btn" id="undoBtn" type="button" data-i18n-title="undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+      <button class="icon-btn" id="redoBtn" type="button" data-i18n-title="redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+      <span class="count" id="count"></span>
+    </div>
+    <div id="checks"></div>
+    <div class="rules" id="list"></div>
+    <div class="empty" id="empty" hidden>
+      <img src="data:image/png;base64,__ICON__" alt="">
+      <h2 data-i18n="empty.title"></h2>
+      <p data-i18n="empty.text"></p>
+      <div class="row">
+        <button class="btn primary" id="emptyAdd" type="button"><svg class="ic"><use href="#i-plus"/></svg><span data-i18n="empty.add"></span></button>
+        <button class="btn" id="emptyOpen" type="button"><svg class="ic"><use href="#i-open"/></svg><span data-i18n="btn.open"></span></button>
+        <button class="btn" id="emptyExample" type="button"><svg class="ic"><use href="#i-sparkle"/></svg><span data-i18n="empty.example"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEST -->
+  <section id="view-test" role="tabpanel" hidden>
+    <div class="panel">
+      <h2 data-i18n="test.title"></h2>
+      <p data-i18n="test.intro"></p>
+      <div style="margin-top:12px"><button class="btn small" id="simReset" type="button"><svg class="ic"><use href="#i-reset"/></svg><span data-i18n="test.reset"></span></button></div>
+      <div id="simEmpty" class="note" hidden data-i18n="test.empty"></div>
+      <div class="cols" id="simCols">
+        <div class="col in"><h3 data-i18n="test.inputs"></h3><div class="sim-tiles" id="simIn"></div></div>
+        <div class="col out"><h3 data-i18n="test.outputs"></h3><div class="sim-tiles" id="simOut"></div></div>
+      </div>
+      <p class="note" data-i18n="test.note"></p>
+    </div>
+  </section>
+
+  <!-- NAMES -->
+  <section id="view-names" role="tabpanel" hidden>
+    <div class="panel">
+      <h2 data-i18n="names.title"></h2>
+      <p data-i18n="names.intro"></p>
+      <div style="margin-top:12px"><button class="btn small" id="namesClear" type="button"><svg class="ic"><use href="#i-trash"/></svg><span data-i18n="names.clear"></span></button></div>
+      <div class="cols">
+        <div class="col in"><h3 data-i18n="names.inputs"></h3><div class="name-grid" id="namesIn"></div></div>
+        <div class="col out"><h3 data-i18n="names.outputs"></h3><div class="name-grid" id="namesOut"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FILE -->
+  <section id="view-file" role="tabpanel" hidden>
+    <div class="panel">
+      <h2 data-i18n="file.title"></h2>
+      <p data-i18n="file.intro"></p>
+      <div class="file-row">
+        <label class="field"><span data-i18n="file.name"></span><input type="text" id="fileName" autocomplete="off" spellcheck="false"></label>
+        <label class="check"><input type="checkbox" id="incLabels"><span data-i18n="file.labels"></span></label>
+        <button class="btn small" id="copyBtn" type="button"><svg class="ic"><use href="#i-copy"/></svg><span data-i18n="file.copy"></span></button>
+      </div>
+      <p class="meta" id="fileMeta" style="margin-bottom:10px"></p>
+      <pre class="code" id="json" tabindex="0"></pre>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <a href="https://www.logi.casa" target="_blank" rel="noopener"><img src="data:image/png;base64,__LOCKUP__" alt="Logi.casa"></a>
+    <span data-i18n="foot.text"></span>
+    <nav>
+      <a href="https://www.logi.casa/shop/esp-home-controller/" target="_blank" rel="noopener" data-i18n="foot.product"></a>
+      <a href="https://www.logi.casa/esp-home-controller-quick-start/" target="_blank" rel="noopener" data-i18n="foot.quick"></a>
+      <a href="https://logi.casa/ticket/" target="_blank" rel="noopener" data-i18n="foot.support"></a>
+    </nav>
+  </div>
+</footer>
+
+<!-- dialogs -->
+<dialog id="picker" aria-labelledby="pickerTitle">
+  <div class="dlg-head"><h2 id="pickerTitle"></h2><button class="icon-btn" type="button" data-close data-i18n-title="close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <p class="dlg-sub" id="pickerSub"></p>
+  <div class="dlg-body"><div id="pickerGrid"></div></div>
+  <div class="pick-foot"><span class="sc" id="pickCount"></span><button class="btn small" id="pickClear" type="button" data-i18n="sel.clear"></button><button class="btn primary" type="button" data-close data-i18n="done"></button></div>
+</dialog>
+
+<dialog id="dlDialog" aria-labelledby="dlTitle">
+  <div class="dlg-head"><h2 id="dlTitle" data-i18n="dl.title"></h2><button class="icon-btn" type="button" data-close data-i18n-title="close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="dlg-body">
+    <p id="dlSaved"></p>
+    <ol class="dl-steps">
+      <li><span data-i18n="dl.s1"></span>
+        <div class="ip-row">
+          <input id="ipInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="192.168.1.50" aria-label="IP">
+          <a class="btn primary" id="openCtl" href="#" target="_blank" rel="noopener" aria-disabled="true"><span data-i18n="dl.open"></span><svg class="ic"><use href="#i-external"/></svg></a>
+        </div>
+      </li>
+      <li data-i18n="dl.s2"></li>
+      <li data-i18n="dl.s3"></li>
+    </ol>
+    <p class="note" data-i18n="dl.note"></p>
+    <div class="dlg-actions"><button class="btn" type="button" data-close data-i18n="dl.done"></button></div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="drop" id="drop" hidden><span data-i18n="drop"></span></div>
+<input type="file" id="fileInput" accept=".json,application/json" hidden>
+<noscript><p style="padding:20px">This editor needs JavaScript.</p></noscript>
+
+<script>
+//<core>
+const Core = (function () {
+  const TRIGGERS = ['both', 'rising', 'falling'];
+  const ACTIONS = ['toggle', 'on', 'off', 'on_for', 'off_for'];
+  const LIMITS = { inputs: 48, outputs: 32, block: 16, rules: 256, maxSeconds: 65535, maxBytes: 32768, metaBytes: 15000, labelLen: 40, nameLen: 60 };
+  const isTimer = (a) => a === 'on_for' || a === 'off_for';
+  const validSeconds = (s) => Number.isInteger(s) && s >= 1 && s <= LIMITS.maxSeconds;
+  const uniqSorted = (arr) => [...new Set(arr)].sort((a, b) => a - b);
+  const bytesOf = (s) => new TextEncoder().encode(s).length;
+
+  /* A "rule" in the editor (group) = several inputs, one trigger, several outputs, one action.
+     The controller only knows flat rules (one input -> one output), so a group expands to
+     every input x output pair. */
+  function expand(groups) {
+    const out = [];
+    for (const g of groups) {
+      for (const i of g.ins) {
+        for (const o of g.outs) {
+          out.push({ in: i, trigger: g.trigger, out: o, action: g.action, seconds: isTimer(g.action) ? g.seconds : null });
+        }
+      }
+    }
+    return out;
+  }
+
+  function parseRule(r) {
+    if (!r || typeof r !== 'object') return null;
+    if (!Number.isInteger(r.in) || r.in < 0 || r.in >= LIMITS.inputs) return null;
+    if (!Number.isInteger(r.out) || r.out < 0 || r.out >= LIMITS.outputs) return null;
+    if (!TRIGGERS.includes(r.trigger) || !ACTIONS.includes(r.action)) return null;
+    let seconds = null;
+    if (isTimer(r.action)) {
+      if (!validSeconds(r.seconds)) return null;
+      seconds = r.seconds;
+    }
+    return { in: r.in, trigger: r.trigger, out: r.out, action: r.action, seconds };
+  }
+
+  // Old files and hand-written files have no groups: merge neighbouring rules that
+  // only differ in their output, so "one button switches four lights off" is one rule again.
+  function fromFlat(rules) {
+    const groups = [];
+    for (const r of rules) {
+      const last = groups[groups.length - 1];
+      if (last && last.ins.length === 1 && last.ins[0] === r.in && last.trigger === r.trigger &&
+          last.action === r.action && (last.seconds || 0) === (r.seconds || 0) && !last.outs.includes(r.out)) {
+        last.outs.push(r.out);
+      } else {
+        groups.push({ name: '', ins: [r.in], trigger: r.trigger, outs: [r.out], action: r.action, seconds: r.seconds });
+      }
+    }
+    groups.forEach((g) => { g.outs = uniqSorted(g.outs); });
+    return groups;
+  }
+
+  function parseNumList(v, max) {
+    if (!Array.isArray(v) || !v.length) return null;
+    if (!v.every((n) => Number.isInteger(n) && n >= 0 && n < max)) return null;
+    return uniqSorted(v);
+  }
+
+  function parseGroups(list) {
+    if (!Array.isArray(list)) return null;
+    const groups = [];
+    for (const g of list) {
+      if (!g || typeof g !== 'object') return null;
+      const ins = parseNumList(g.in, LIMITS.inputs);
+      const outs = parseNumList(g.out, LIMITS.outputs);
+      if (!ins || !outs || !TRIGGERS.includes(g.trigger) || !ACTIONS.includes(g.action)) return null;
+      let seconds = null;
+      if (isTimer(g.action)) {
+        if (!validSeconds(g.seconds)) return null;
+        seconds = g.seconds;
+      }
+      const name = typeof g.name === 'string' ? g.name.trim().slice(0, LIMITS.nameLen) : '';
+      groups.push({ name, ins, trigger: g.trigger, outs, action: g.action, seconds });
+    }
+    return groups;
+  }
+
+  const sig = (r) => `${r.in}|${r.trigger}|${r.out}|${r.action}|${r.seconds || 0}`;
+  const sameRules = (a, b) => {
+    if (a.length !== b.length) return false;
+    const x = a.map(sig).sort(), y = b.map(sig).sort();
+    return x.every((v, i) => v === y[i]);
+  };
+
+  function parseFile(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { return { error: 'json' }; }
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !Array.isArray(data.rules)) return { error: 'format' };
+    const rules = [];
+    let skipped = 0;
+    for (const r of data.rules) {
+      const p = parseRule(r);
+      if (p) rules.push(p); else skipped++;
+    }
+    const labels = { in: {}, out: {} };
+    if (data.labels && typeof data.labels === 'object' && !Array.isArray(data.labels)) {
+      for (const k of ['in', 'out']) {
+        const src = data.labels[k];
+        if (!src || typeof src !== 'object' || Array.isArray(src)) continue;
+        const max = k === 'in' ? LIMITS.inputs : LIMITS.outputs;
+        for (const [n, v] of Object.entries(src)) {
+          const i = Number(n);
+          if (Number.isInteger(i) && i >= 0 && i < max && typeof v === 'string' && v.trim()) {
+            labels[k][i] = v.trim().slice(0, LIMITS.labelLen);
+          }
+        }
+      }
+    }
+    // Use the saved rule layout only when it still matches the flat rules exactly.
+    let groups = null, restored = false;
+    const saved = parseGroups(data.groups);
+    if (saved && skipped === 0 && sameRules(expand(saved), rules)) { groups = saved; restored = true; }
+    if (!groups) groups = fromFlat(rules);
+    return { groups, labels, skipped, restored };
+  }
+
+  function ruleLine(r) {
+    let s = `{ "in": ${r.in}, "trigger": "${r.trigger}", "out": ${r.out}, "action": "${r.action}"`;
+    if (isTimer(r.action)) s += `, "seconds": ${r.seconds}`;
+    return s + ' }';
+  }
+
+  function groupLine(g) {
+    let s = '{ ';
+    if (g.name) s += `"name": ${JSON.stringify(g.name)}, `;
+    s += `"in": [${g.ins.join(', ')}], "trigger": "${g.trigger}", "out": [${g.outs.join(', ')}], "action": "${g.action}"`;
+    if (isTimer(g.action)) s += `, "seconds": ${g.seconds}`;
+    return s + ' }';
+  }
+
+  function labelBlock(map) {
+    const keys = Object.keys(map).map(Number).sort((a, b) => a - b);
+    if (!keys.length) return '{}';
+    return '{\n' + keys.map((i) => `      ${JSON.stringify(String(i))}: ${JSON.stringify(map[i])}`).join(',\n') + '\n    }';
+  }
+
+  function serialize(groups, labels, withMeta) {
+    const flat = expand(groups);
+    let s = '{\n  "version": 1,\n  "rules": [';
+    if (flat.length) s += '\n' + flat.map((r) => '    ' + ruleLine(r)).join(',\n') + '\n  ';
+    s += ']';
+    if (withMeta) {
+      if (groups.length) s += ',\n  "groups": [\n' + groups.map((g) => '    ' + groupLine(g)).join(',\n') + '\n  ]';
+      if (Object.keys(labels.in).length || Object.keys(labels.out).length) {
+        s += ',\n  "labels": {\n    "in": ' + labelBlock(labels.in) + ',\n    "out": ' + labelBlock(labels.out) + '\n  }';
+      }
+    }
+    return s + '\n}\n';
+  }
+
+  // Size of what the controller stores next to the rules (names + layout).
+  function metaBytes(groups, labels) {
+    const o = {};
+    if (groups.length) o.groups = groups.map((g) => ({ name: g.name || undefined, in: g.ins, trigger: g.trigger, out: g.outs, action: g.action, seconds: isTimer(g.action) ? g.seconds : undefined }));
+    o.labels = labels;
+    return bytesOf(JSON.stringify(o));
+  }
+
+  function validate(groups, bytes, meta, withMeta) {
+    const issues = [];
+    groups.forEach((g, i) => {
+      if (!g.ins.length) issues.push({ level: 'error', code: 'noIn', uid: g.uid, n: i + 1 });
+      if (!g.outs.length) issues.push({ level: 'error', code: 'noOut', uid: g.uid, n: i + 1 });
+      if (isTimer(g.action) && !validSeconds(g.seconds)) issues.push({ level: 'error', code: 'seconds', uid: g.uid, n: i + 1 });
+    });
+    const count = expand(groups).length;
+    if (count > LIMITS.rules) issues.push({ level: 'error', code: 'tooMany', n: count, max: LIMITS.rules });
+    if (bytes > LIMITS.maxBytes) issues.push({ level: 'error', code: 'tooBig', kb: (bytes / 1024).toFixed(1) });
+    if (withMeta && meta > LIMITS.metaBytes) issues.push({ level: 'warn', code: 'metaBig' });
+    for (let i = 0; i < groups.length; i++) {
+      for (let j = i + 1; j < groups.length; j++) {
+        const a = groups[i], b = groups[j];
+        const sharedIn = a.ins.filter((x) => b.ins.includes(x));
+        const sharedOut = a.outs.filter((x) => b.outs.includes(x));
+        if (!sharedIn.length || !sharedOut.length) continue;
+        const same = a.trigger === b.trigger && a.action === b.action && (a.seconds || 0) === (b.seconds || 0);
+        if (same) {
+          issues.push({ level: 'warn', code: 'dup', uid: b.uid, a: i + 1, b: j + 1 });
+        } else if (a.trigger === b.trigger || a.trigger === 'both' || b.trigger === 'both') {
+          issues.push({ level: 'warn', code: 'overlap', uid: b.uid, a: i + 1, b: j + 1, in: sharedIn[0] + 1, out: sharedOut[0] + 1 });
+        }
+      }
+    }
+    return issues;
+  }
+
+  // Mirrors the controller: same triggers, same actions, same timer handling.
+  class Sim {
+    constructor(rules) { this.rules = rules; this.reset(); }
+    reset() {
+      this.inputs = new Array(LIMITS.inputs).fill(false);
+      this.outputs = new Array(LIMITS.outputs).fill(false);
+      this.timers = new Map();
+    }
+    setInput(i, state, now) {
+      if (this.inputs[i] === state) return false;
+      this.inputs[i] = state;
+      for (const r of this.rules) {
+        if (r.in !== i) continue;
+        if (r.trigger === 'rising' && !state) continue;
+        if (r.trigger === 'falling' && state) continue;
+        this.run(r, now);
+      }
+      return true;
+    }
+    run(r, now) {
+      const o = r.out;
+      this.timers.delete(o);
+      switch (r.action) {
+        case 'toggle': this.outputs[o] = !this.outputs[o]; break;
+        case 'on': this.outputs[o] = true; break;
+        case 'off': this.outputs[o] = false; break;
+        case 'on_for': this.outputs[o] = true; this.timers.set(o, { end: now + r.seconds * 1000, target: false }); break;
+        case 'off_for': this.outputs[o] = false; this.timers.set(o, { end: now + r.seconds * 1000, target: true }); break;
+      }
+    }
+    tick(now) {
+      let changed = false;
+      for (const [o, t] of this.timers) {
+        if (now >= t.end) { this.outputs[o] = t.target; this.timers.delete(o); changed = true; }
+      }
+      return changed;
+    }
+  }
+
+  return { TRIGGERS, ACTIONS, LIMITS, isTimer, validSeconds, expand, fromFlat, parseFile, serialize, metaBytes, validate, Sim };
+})();
+//</core>
+</script>
+
+<script>
+(function () {
+'use strict';
+
+/* ---------- translations ---------- */
+const I18N = {
+  en: {
+    'nav.install': 'Install', 'nav.editor': 'Fallback editor',
+    'inst.title': 'Install the firmware',
+    'inst.tag': 'Flash the latest firmware to your Logi.casa ESP Home Controller straight from your browser. Nothing to install.',
+    'inst.variant': 'Which controller do you have?', 'inst.eth': 'Ethernet', 'inst.wifi': 'WiFi',
+    'inst.hint.ethernet': 'For controllers connected with a network cable (RJ45).',
+    'inst.hint.wifi': 'For controllers that connect over WiFi. Right after flashing, you enter your WiFi details here in the browser.',
+    'inst.prep': 'Before you start',
+    'inst.p1': 'Open the casing and connect the mainboard to your computer with a micro-USB cable that can carry data.',
+    'inst.p2': 'Set the DIP switch on the mainboard to FLASH mode.',
+    'inst.p3': 'Click Install firmware and choose the serial port of the controller.',
+    'inst.p4': 'When it has finished, set the DIP switch back, so the controller can start.',
+    'inst.btn': 'Install firmware', 'inst.version': 'Latest version: {v}',
+    'inst.noversion': 'No firmware is published on this page yet.',
+    'inst.unsupported': 'Your browser cannot flash over USB. Use Chrome or Edge on a computer.',
+    'inst.notallowed': 'Flashing needs a secure (https) connection.',
+    'inst.next.title': 'What next?',
+    'inst.next.1': 'Take control of the controller in ESPHome Builder and add it to Home Assistant.',
+    'inst.next.guide': 'Open the quick-start guide',
+    'inst.next.2': 'Make your lights keep working when Home Assistant is away.',
+    'inst.next.fallback': 'Build the fallback file',
+    'app.title': 'Fallback editor',
+    'app.tag': 'Build the rules your controller follows when Home Assistant is away. A rule connects one or more inputs to one or more outputs.',
+    'step.1': 'Build your rules', 'step.2': 'Download the file', 'step.3': 'Upload it to your controller',
+    'btn.open': 'Open file', 'btn.new': 'New', 'btn.download': 'Download',
+    'tab.rules': 'Rules', 'tab.test': 'Test', 'tab.names': 'Names', 'tab.file': 'File',
+    'add.rule': 'Add rule', 'presets': 'Quick add', 'search.ph': 'Search by number or name',
+    'sort': 'Sort by input', 'undo': 'Undo', 'redo': 'Redo', 'close': 'Close',
+    'preset.switch': 'Wall switch toggles a light', 'preset.push': 'Push button toggles a light',
+    'preset.twoin': 'One light, several switches',
+    'preset.hold': 'Light is on while the button is held', 'preset.timer': 'Light on for a set time',
+    'preset.alloff': 'One button switches several lights off',
+    'rule': 'Rule', 'rule.name.ph': 'Name this rule (optional)', 'when': 'When', 'then': 'Then',
+    'input': 'Input', 'output': 'Output',
+    'in.choose': 'Choose inputs', 'in.change': 'Add or remove', 'out.choose': 'Choose outputs', 'out.change': 'Add or remove',
+    'remove': 'Remove', 'multi.in': 'Any of these inputs triggers the rule.', 'multi.out': 'Every one of these outputs gets the action.',
+    'trigger.both': 'Switch changes', 'trigger.rising': 'Button pressed', 'trigger.falling': 'Button released',
+    'hint.both': 'Reacts to every change, on and off. Made for wall switches.',
+    'hint.rising': 'Reacts when the input becomes active. Made for push buttons.',
+    'hint.falling': 'Reacts when the input becomes inactive again.',
+    'action.toggle': 'Toggle', 'action.on': 'Switch on', 'action.off': 'Switch off', 'action.on_for': 'On for…', 'action.off_for': 'Off for…',
+    'ahint.toggle': 'Flips the output: on becomes off, off becomes on.',
+    'ahint.on': 'Switches the output on.', 'ahint.off': 'Switches the output off.',
+    'ahint.on_for': 'Switches on, then off again after this time. Triggering again restarts the time.',
+    'ahint.off_for': 'Switches off, then on again after this time. Triggering again restarts the time.',
+    'time': 'Time', 'unit': 'Unit', 'unit.s': 'seconds', 'unit.min': 'minutes', 'unit.h': 'hours',
+    'dup': 'Duplicate', 'del': 'Delete', 'deleted': 'Rule deleted.', 'undo.do': 'Undo',
+    'expands': '{n} in file',
+    'count': '{n} rules, {f} of {max} file entries',
+    'checks.ok': 'No problems found.', 'checks.err': '{n} to fix before you can download', 'checks.warn': '{n} to look at',
+    'issue.noIn': 'Rule {n}: choose at least one input.',
+    'issue.noOut': 'Rule {n}: choose at least one output.',
+    'issue.seconds': 'Rule {n}: set a time between 1 second and 18 hours.',
+    'issue.tooMany': 'A controller stores at most {max} file entries (every input and output pair counts as one). You have {n}.',
+    'issue.tooBig': 'The file is {kb} KB and the controller accepts at most 32 KB. Remove rules or leave out the names.',
+    'issue.metaBig': 'The names and rule layout are too large for the controller to keep. The rules still work, but names will be missing when you download from the controller.',
+    'issue.dup': 'Rules {a} and {b} are identical.',
+    'issue.overlap': 'Rules {a} and {b} both react to input {in} and control output {out}. They run one after the other.',
+    'empty.title': 'No rules yet', 'empty.text': 'Add your first rule, or open a file you made earlier.',
+    'empty.add': 'Add first rule', 'empty.example': 'Try an example',
+    'pick.inputs': 'Choose inputs', 'pick.outputs': 'Choose outputs',
+    'pick.sub.in': 'Tap to select. Inputs come in blocks of 16, like on the controller.',
+    'pick.sub.out': 'Tap to select. Outputs come in blocks of 16, like on the controller.',
+    'block': 'Block {n}', 'range.in': 'Inputs {a} to {b}', 'range.out': 'Outputs {a} to {b}',
+    'sel.block': 'Select block', 'sel.none': 'Clear block', 'sel.clear': 'Clear all', 'sel.count': '{n} selected', 'done': 'Done',
+    'used': 'used in {n} other rules',
+    'test.title': 'Try your rules', 'test.intro': 'Press the blue inputs and watch the green outputs, the way the controller reacts while Home Assistant is away.',
+    'test.reset': 'Reset test', 'test.empty': 'Add rules first, then test them here.',
+    'test.inputs': 'Inputs', 'test.outputs': 'Outputs',
+    'test.mode': 'Behaves like a switch', 'test.left': '{s} s left',
+    'test.note': 'Outputs start switched off. The test follows the same rules as the controller, but timing can differ by a fraction of a second.',
+    'names.title': 'Names', 'names.intro': 'Give your inputs and outputs a name, such as “Hallway switch”. The names show up in your rules.',
+    'names.inputs': 'Inputs', 'names.outputs': 'Outputs', 'names.ph': 'Name', 'names.clear': 'Clear all names',
+    'file.title': 'Your fallback file', 'file.intro': 'This is the file you upload to the controller. You can also open it later to change it.',
+    'file.name': 'File name', 'file.labels': 'Save names and rule layout in the file', 'file.copy': 'Copy',
+    'file.copied': 'Copied.', 'file.meta': '{n} rules, {f} file entries, {kb} KB',
+    'file.labelsHint': 'The controller stores them with the rules, so you can download and edit them later.',
+    'dl.title': 'Your file is ready', 'dl.saved': 'Saved as {name}. Now put it on your controller:',
+    'dl.s1': 'Enter the IP address of your controller (you can find it in Home Assistant).',
+    'dl.open': 'Open controller page',
+    'dl.s2': 'Log in with user name admin. The first time, you choose a password.',
+    'dl.s3': 'Choose the file and press Upload.',
+    'dl.note': 'This editor only opens the page of your controller. Your file stays on your computer until you upload it there.',
+    'dl.done': 'Done',
+    'opened': 'Opened {name}: {n} rules.', 'skipped': '{k} entries could not be read and were skipped.',
+    'regrouped': 'The saved layout did not match the rules, so rules were grouped automatically.',
+    'err.json': 'This file is not valid JSON.', 'err.format': 'This does not look like a fallback file.',
+    'err.empty': 'Add a rule first.', 'err.fix': 'Fix the problems first.',
+    'new.done': 'Started a new, empty file.', 'sorted': 'Sorted by input.',
+    'restored': 'Restored your unsaved work.', 'startover': 'Start over',
+    'drop': 'Drop your fallback file here',
+    'leave': 'You have changes that are not downloaded yet.',
+    'foot.text': 'Made for the Logi.casa ESP Home Controller.',
+    'foot.product': 'Product page', 'foot.quick': 'Quick start', 'foot.support': 'Support',
+    'example.groups': ['Hallway light', 'Kitchen light (2 switches)', 'Light on while held', 'Light off when released', 'Timer light', 'Pause light', 'All lights off'],
+    'example.labelsIn': { 0: 'Hallway switch', 1: 'Kitchen switch', 2: 'Hold button', 3: 'Timer button', 4: 'Pause button', 5: 'All-off button', 7: 'Kitchen switch 2' },
+    'example.labelsOut': { 0: 'Hallway', 1: 'Kitchen', 2: 'Stairs', 3: 'Office', 4: 'Terrace' }
+  },
+  nl: {
+    'nav.install': 'Installeren', 'nav.editor': 'Fallback-editor',
+    'inst.title': 'Firmware installeren',
+    'inst.tag': 'Flash de nieuwste firmware op je Logi.casa ESP Home Controller, rechtstreeks vanuit je browser. Je hoeft niets te installeren.',
+    'inst.variant': 'Welke controller heb je?', 'inst.eth': 'Ethernet', 'inst.wifi': 'WiFi',
+    'inst.hint.ethernet': 'Voor controllers die met een netwerkkabel (RJ45) verbonden zijn.',
+    'inst.hint.wifi': 'Voor controllers die via WiFi verbinden. Meteen na het flashen vul je hier in de browser je WiFi-gegevens in.',
+    'inst.prep': 'Voor je begint',
+    'inst.p1': 'Open de behuizing en verbind het moederbord met je computer via een micro-USB-kabel die data kan doorgeven.',
+    'inst.p2': 'Zet de DIP-switch op het moederbord in de FLASH-stand.',
+    'inst.p3': 'Klik op Firmware installeren en kies de seriële poort van de controller.',
+    'inst.p4': 'Zet de DIP-switch daarna terug, zodat de controller kan opstarten.',
+    'inst.btn': 'Firmware installeren', 'inst.version': 'Nieuwste versie: {v}',
+    'inst.noversion': 'Op deze pagina is nog geen firmware gepubliceerd.',
+    'inst.unsupported': 'Je browser kan niet via USB flashen. Gebruik Chrome of Edge op een computer.',
+    'inst.notallowed': 'Flashen vereist een beveiligde (https) verbinding.',
+    'inst.next.title': 'En dan?',
+    'inst.next.1': 'Neem de controller over in ESPHome Builder en voeg hem toe aan Home Assistant.',
+    'inst.next.guide': 'Open de snelstartgids',
+    'inst.next.2': 'Laat je lichten werken wanneer Home Assistant wegvalt.',
+    'inst.next.fallback': 'Bouw het fallback-bestand',
+    'app.title': 'Fallback-editor',
+    'app.tag': 'Bouw de regels die je controller volgt wanneer Home Assistant wegvalt. Een regel koppelt één of meer ingangen aan één of meer uitgangen.',
+    'step.1': 'Bouw je regels', 'step.2': 'Download het bestand', 'step.3': 'Upload het naar je controller',
+    'btn.open': 'Bestand openen', 'btn.new': 'Nieuw', 'btn.download': 'Downloaden',
+    'tab.rules': 'Regels', 'tab.test': 'Testen', 'tab.names': 'Namen', 'tab.file': 'Bestand',
+    'add.rule': 'Regel toevoegen', 'presets': 'Snel toevoegen', 'search.ph': 'Zoek op nummer of naam',
+    'sort': 'Sorteren op ingang', 'undo': 'Ongedaan maken', 'redo': 'Opnieuw', 'close': 'Sluiten',
+    'preset.switch': 'Wandschakelaar schakelt een lamp om', 'preset.push': 'Drukknop schakelt een lamp om',
+    'preset.twoin': 'Eén lamp, meerdere schakelaars',
+    'preset.hold': 'Lamp brandt zolang de knop ingedrukt is', 'preset.timer': 'Lamp aan gedurende een vaste tijd',
+    'preset.alloff': 'Eén knop zet meerdere lampen uit',
+    'rule': 'Regel', 'rule.name.ph': 'Geef deze regel een naam (optioneel)', 'when': 'Wanneer', 'then': 'Dan',
+    'input': 'Ingang', 'output': 'Uitgang',
+    'in.choose': 'Kies ingangen', 'in.change': 'Toevoegen of verwijderen', 'out.choose': 'Kies uitgangen', 'out.change': 'Toevoegen of verwijderen',
+    'remove': 'Verwijderen', 'multi.in': 'Elk van deze ingangen activeert de regel.', 'multi.out': 'Al deze uitgangen krijgen de actie.',
+    'trigger.both': 'Schakelaar wijzigt', 'trigger.rising': 'Knop ingedrukt', 'trigger.falling': 'Knop losgelaten',
+    'hint.both': 'Reageert op elke wijziging, aan én uit. Bedoeld voor wandschakelaars.',
+    'hint.rising': 'Reageert zodra de ingang actief wordt. Bedoeld voor drukknoppen.',
+    'hint.falling': 'Reageert zodra de ingang weer inactief wordt.',
+    'action.toggle': 'Omschakelen', 'action.on': 'Aanzetten', 'action.off': 'Uitzetten', 'action.on_for': 'Aan gedurende…', 'action.off_for': 'Uit gedurende…',
+    'ahint.toggle': 'Draait de uitgang om: aan wordt uit, uit wordt aan.',
+    'ahint.on': 'Zet de uitgang aan.', 'ahint.off': 'Zet de uitgang uit.',
+    'ahint.on_for': 'Zet aan en na deze tijd weer uit. Opnieuw triggeren start de tijd opnieuw.',
+    'ahint.off_for': 'Zet uit en na deze tijd weer aan. Opnieuw triggeren start de tijd opnieuw.',
+    'time': 'Duur', 'unit': 'Eenheid', 'unit.s': 'seconden', 'unit.min': 'minuten', 'unit.h': 'uren',
+    'dup': 'Dupliceren', 'del': 'Verwijderen', 'deleted': 'Regel verwijderd.', 'undo.do': 'Ongedaan maken',
+    'expands': '{n} in bestand',
+    'count': '{n} regels, {f} van {max} bestandsregels',
+    'checks.ok': 'Geen problemen gevonden.', 'checks.err': '{n} op te lossen voor je kunt downloaden', 'checks.warn': '{n} om na te kijken',
+    'issue.noIn': 'Regel {n}: kies minstens één ingang.',
+    'issue.noOut': 'Regel {n}: kies minstens één uitgang.',
+    'issue.seconds': 'Regel {n}: stel een duur in tussen 1 seconde en 18 uur.',
+    'issue.tooMany': 'Een controller bewaart maximaal {max} bestandsregels (elk paar ingang en uitgang telt als één). Je hebt er {n}.',
+    'issue.tooBig': 'Het bestand is {kb} KB en de controller aanvaardt maximaal 32 KB. Verwijder regels of laat de namen weg.',
+    'issue.metaBig': 'De namen en de opbouw van je regels zijn te groot om op de controller te bewaren. De regels werken wel, maar namen ontbreken als je van de controller downloadt.',
+    'issue.dup': 'Regels {a} en {b} zijn identiek.',
+    'issue.overlap': 'Regels {a} en {b} reageren allebei op ingang {in} en sturen uitgang {out} aan. Ze worden na elkaar uitgevoerd.',
+    'empty.title': 'Nog geen regels', 'empty.text': 'Voeg je eerste regel toe of open een bestand dat je eerder maakte.',
+    'empty.add': 'Eerste regel toevoegen', 'empty.example': 'Probeer een voorbeeld',
+    'pick.inputs': 'Kies ingangen', 'pick.outputs': 'Kies uitgangen',
+    'pick.sub.in': 'Tik om te selecteren. De ingangen staan in blokken van 16, zoals op de controller.',
+    'pick.sub.out': 'Tik om te selecteren. De uitgangen staan in blokken van 16, zoals op de controller.',
+    'block': 'Blok {n}', 'range.in': 'Ingangen {a} tot {b}', 'range.out': 'Uitgangen {a} tot {b}',
+    'sel.block': 'Blok selecteren', 'sel.none': 'Blok wissen', 'sel.clear': 'Alles wissen', 'sel.count': '{n} geselecteerd', 'done': 'Klaar',
+    'used': 'gebruikt in {n} andere regels',
+    'test.title': 'Probeer je regels uit', 'test.intro': 'Druk op de blauwe ingangen en kijk hoe de groene uitgangen reageren, zoals de controller doet wanneer Home Assistant wegvalt.',
+    'test.reset': 'Test herstarten', 'test.empty': 'Voeg eerst regels toe, dan kun je ze hier testen.',
+    'test.inputs': 'Ingangen', 'test.outputs': 'Uitgangen',
+    'test.mode': 'Gedraagt zich als schakelaar', 'test.left': 'nog {s} s',
+    'test.note': 'Uitgangen starten uit. De test volgt dezelfde regels als de controller, maar de timing kan een fractie van een seconde afwijken.',
+    'names.title': 'Namen', 'names.intro': 'Geef je ingangen en uitgangen een naam, zoals “Schakelaar hal”. De namen verschijnen in je regels.',
+    'names.inputs': 'Ingangen', 'names.outputs': 'Uitgangen', 'names.ph': 'Naam', 'names.clear': 'Alle namen wissen',
+    'file.title': 'Je fallback-bestand', 'file.intro': 'Dit is het bestand dat je naar de controller uploadt. Je kunt het later ook openen om het aan te passen.',
+    'file.name': 'Bestandsnaam', 'file.labels': 'Namen en opbouw van de regels opslaan in het bestand', 'file.copy': 'Kopiëren',
+    'file.copied': 'Gekopieerd.', 'file.meta': '{n} regels, {f} bestandsregels, {kb} KB',
+    'file.labelsHint': 'De controller bewaart ze samen met de regels, zodat je ze later kunt downloaden en aanpassen.',
+    'dl.title': 'Je bestand is klaar', 'dl.saved': 'Opgeslagen als {name}. Zet het nu op je controller:',
+    'dl.s1': 'Vul het IP-adres van je controller in (je vindt het in Home Assistant).',
+    'dl.open': 'Controller-pagina openen',
+    'dl.s2': 'Log in met gebruikersnaam admin. De eerste keer kies je een wachtwoord.',
+    'dl.s3': 'Kies het bestand en klik op Upload.',
+    'dl.note': 'Deze editor opent enkel de pagina van je controller. Je bestand blijft op je computer tot je het daar uploadt.',
+    'dl.done': 'Klaar',
+    'opened': '{name} geopend: {n} regels.', 'skipped': '{k} items konden niet gelezen worden en zijn overgeslagen.',
+    'regrouped': 'De opgeslagen opbouw kwam niet overeen met de regels, dus de regels zijn automatisch gegroepeerd.',
+    'err.json': 'Dit bestand is geen geldige JSON.', 'err.format': 'Dit lijkt geen fallback-bestand.',
+    'err.empty': 'Voeg eerst een regel toe.', 'err.fix': 'Los eerst de problemen op.',
+    'new.done': 'Nieuw, leeg bestand gestart.', 'sorted': 'Gesorteerd op ingang.',
+    'restored': 'Je niet-gedownloade werk is hersteld.', 'startover': 'Opnieuw beginnen',
+    'drop': 'Sleep je fallback-bestand hierheen',
+    'leave': 'Je hebt wijzigingen die nog niet gedownload zijn.',
+    'foot.text': 'Gemaakt voor de Logi.casa ESP Home Controller.',
+    'foot.product': 'Productpagina', 'foot.quick': 'Snelstart', 'foot.support': 'Support',
+    'example.groups': ['Lamp hal', 'Lamp keuken (2 schakelaars)', 'Lamp aan zolang ingedrukt', 'Lamp uit bij loslaten', 'Timerlamp', 'Pauzelamp', 'Alle lichten uit'],
+    'example.labelsIn': { 0: 'Schakelaar hal', 1: 'Schakelaar keuken', 2: 'Vasthoudknop', 3: 'Timerknop', 4: 'Pauzeknop', 5: 'Alles-uit-knop', 7: 'Schakelaar keuken 2' },
+    'example.labelsOut': { 0: 'Hal', 1: 'Keuken', 2: 'Trap', 3: 'Bureau', 4: 'Terras' }
+  }
+};
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage may be unavailable */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
+};
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const UNIT = { s: 1, min: 60, h: 3600 };
+const TRIGGER_ICON = { both: 'switch', rising: 'press', falling: 'release' };
+const ACTION_ICON = { toggle: 'swap', on: 'on', off: 'off', on_for: 'timer', off_for: 'timer' };
+const BLOCK = Core.LIMITS.block;
+const MAXCHIPS = 8;
+const sortNum = (a) => [...new Set(a)].sort((x, y) => x - y);
+
+/* ---------- state ---------- */
+let lang = store.get('logicasa.lang') || ((navigator.language || 'en').toLowerCase().startsWith('nl') ? 'nl' : 'en');
+let uidSeq = 1;
+const state = { groups: [], labels: { in: {}, out: {} }, fileName: 'fallback.json', includeLabels: true, dirty: false, filter: '', tab: 'rules' };
+const hist = { undo: [], redo: [], key: null, time: 0 };
+let listStale = true;
+let page = 'install';
+
+function t(key, p) {
+  let s = (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key;
+  if (p && typeof s === 'string') s = s.replace(/\{(\w+)\}/g, (m, k) => (k in p ? p[k] : m));
+  return s;
+}
+const newGroup = (o) => Object.assign({ uid: uidSeq++, name: '', ins: [0], trigger: 'rising', outs: [0], action: 'toggle', seconds: null, unit: null }, o || {});
+const byUid = (uid) => state.groups.find((g) => g.uid === uid);
+const bestUnit = (s) => (s > 0 && s % 3600 === 0 ? 'h' : s > 0 && s % 60 === 0 ? 'min' : 's');
+const unitOf = (g) => g.unit || bestUnit(g.seconds || 0);
+const plainG = (g) => ({ name: g.name || '', ins: sortNum(g.ins), trigger: g.trigger, outs: sortNum(g.outs), action: g.action, seconds: Core.isTimer(g.action) ? g.seconds : null });
+const full = (g) => ({ ...plainG(g), unit: g.unit });
+const currentText = () => Core.serialize(state.groups.map(plainG), state.labels, state.includeLabels);
+const textBytes = (s) => new Blob([s]).size;
+const labelOf = (kind, n) => state.labels[kind][n] || '';
+const flatCount = () => Core.expand(state.groups.map(plainG)).length;
+
+function snapshot() { return JSON.stringify({ groups: state.groups.map(full), labels: state.labels }); }
+function restore(s) {
+  const d = JSON.parse(s);
+  state.groups = d.groups.map((g) => newGroup(g));
+  state.labels = d.labels;
+}
+
+function mutate(fn, key) {
+  const now = Date.now();
+  if (!(key && hist.key === key && now - hist.time < 1500)) {
+    hist.undo.push(snapshot());
+    if (hist.undo.length > 60) hist.undo.shift();
+  }
+  hist.key = key || null;
+  hist.time = now;
+  hist.redo = [];
+  fn();
+  state.dirty = true;
+  changed(!key);
+}
+function undo() {
+  if (!hist.undo.length) return;
+  hist.redo.push(snapshot());
+  restore(hist.undo.pop());
+  hist.key = null;
+  state.dirty = true;
+  changed(true, true);
+}
+function redo() {
+  if (!hist.redo.length) return;
+  hist.undo.push(snapshot());
+  restore(hist.redo.pop());
+  hist.key = null;
+  state.dirty = true;
+  changed(true, true);
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    store.set('logicasa.fallback.draft2', JSON.stringify({ groups: state.groups.map(full), labels: state.labels, fileName: state.fileName, includeLabels: state.includeLabels }));
+  }, 400);
+}
+
+function changed(rerenderList, everything) {
+  if (rerenderList) listStale = true;
+  renderChecks();
+  if (state.tab === 'rules' && listStale) renderList();
+  if (state.tab === 'names' && everything) renderNames();
+  if (state.tab === 'file') renderFile();
+  if (state.tab === 'test') buildSim();
+  scheduleSave();
+}
+
+/* ---------- toast ---------- */
+let toastTimer = null;
+function toast(msg, action) {
+  const el = $('#toast');
+  el.innerHTML = '<span></span>';
+  el.firstChild.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = action.label;
+    b.addEventListener('click', () => { action.fn(); el.hidden = true; });
+    el.appendChild(b);
+  }
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, action ? 7000 : 3500);
+}
+
+/* ---------- i18n ---------- */
+function applyI18n() {
+  document.documentElement.lang = lang;
+  document.title = t(page === 'install' ? 'inst.title' : 'app.title') + ' – Logi.casa';
+  $$('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  $$('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+  $$('[data-i18n-title]').forEach((el) => { const v = t(el.dataset.i18nTitle); el.title = v; el.setAttribute('aria-label', v); });
+  const lb = $('#langBtn');
+  lb.textContent = lang === 'en' ? 'NL' : 'EN';
+  lb.setAttribute('aria-label', lang === 'en' ? 'Nederlands' : 'English');
+  lb.title = lb.getAttribute('aria-label');
+  $('#presetPop').innerHTML = ['switch', 'push', 'twoin', 'hold', 'timer', 'alloff'].map((k) => `<button type="button" data-preset="${k}">${esc(t('preset.' + k))}</button>`).join('');
+  $('#search').setAttribute('aria-label', t('search.ph'));
+  listStale = true;
+  changed(true, true);
+  if (state.tab === 'names') renderNames();
+}
+
+/* ---------- chrome ---------- */
+let lastIssues = [];
+function updateChrome() {
+  const n = state.groups.length;
+  $('#ruleBadge').textContent = n;
+  $('#count').textContent = t('count', { n, f: flatCount(), max: Core.LIMITS.rules });
+  $('#undoBtn').disabled = !hist.undo.length;
+  $('#redoBtn').disabled = !hist.redo.length;
+  $('#undoBtn').style.opacity = hist.undo.length ? 1 : .4;
+  $('#redoBtn').style.opacity = hist.redo.length ? 1 : .4;
+  $('#sortBtn').disabled = n < 2;
+  $('#sortBtn').style.opacity = n < 2 ? .4 : 1;
+  $('#empty').hidden = n > 0 || state.tab !== 'rules';
+  $('#list').hidden = n === 0;
+  const hasErr = lastIssues.some((i) => i.level === 'error');
+  $('#dlBtn').disabled = n === 0 || hasErr;
+}
+
+function renderChecks() {
+  const g = state.groups.map(plainG).map((x, i) => ({ ...x, uid: state.groups[i].uid }));
+  lastIssues = Core.validate(g, textBytes(currentText()), Core.metaBytes(state.groups.map(plainG), state.labels), state.includeLabels);
+  const box = $('#checks');
+  const errs = lastIssues.filter((i) => i.level === 'error');
+  const warns = lastIssues.filter((i) => i.level === 'warn');
+  if (!state.groups.length) { box.innerHTML = ''; updateChrome(); return; }
+  if (!lastIssues.length) {
+    box.innerHTML = `<div class="checks ok"><svg class="ic"><use href="#i-check"/></svg><span>${esc(t('checks.ok'))}</span></div>`;
+  } else {
+    const cls = errs.length ? 'has-err' : 'has-warn';
+    const head = errs.length ? t('checks.err', { n: errs.length }) : t('checks.warn', { n: warns.length });
+    box.innerHTML = `<details class="checks ${cls}" open><summary><svg class="ic"><use href="#i-warn"/></svg><span>${esc(head)}</span></summary><ul>${lastIssues.map((i) => `<li><button type="button" data-goto="${i.uid || ''}">${esc(t('issue.' + i.code, i))}</button></li>`).join('')}</ul></details>`;
+  }
+  updateChrome();
+}
+
+/* ---------- rule list ---------- */
+const matches = (g) => {
+  const q = state.filter.trim().toLowerCase();
+  if (!q) return true;
+  const num = Number(q);
+  if (Number.isInteger(num) && (g.ins.includes(num - 1) || g.outs.includes(num - 1))) return true;
+  if ((g.name || '').toLowerCase().includes(q)) return true;
+  return g.ins.some((i) => labelOf('in', i).toLowerCase().includes(q)) || g.outs.some((o) => labelOf('out', o).toLowerCase().includes(q));
+};
+
+function chipsHTML(kind, g) {
+  const arr = kind === 'in' ? g.ins : g.outs;
+  let h = arr.slice(0, MAXCHIPS).map((n) => {
+    const nm = labelOf(kind, n);
+    return `<span class="chip"><b>${n + 1}</b>${nm ? `<small>${esc(nm)}</small>` : ''}<button type="button" data-rm="${n}" data-side="${kind}" title="${esc(t('remove'))} ${n + 1}" aria-label="${esc(t('remove'))} ${n + 1}"><svg class="ic"><use href="#i-close"/></svg></button></span>`;
+  }).join('');
+  if (arr.length > MAXCHIPS) h += `<button type="button" class="chip more" data-pick="${kind}">+${arr.length - MAXCHIPS}</button>`;
+  h += `<button type="button" class="btn small chip-add" data-pick="${kind}"><svg class="ic"><use href="#i-plus"/></svg><span>${esc(t(kind + '.' + (arr.length ? 'change' : 'choose')))}</span></button>`;
+  return `<div class="chips">${h}</div>`;
+}
+
+function durHTML(g) {
+  if (!Core.isTimer(g.action)) return '';
+  const u = unitOf(g);
+  const v = g.seconds ? +(g.seconds / UNIT[u]).toFixed(3) : '';
+  return `<div class="dur"><label>${esc(t('time'))}<input class="dur-val" type="number" inputmode="decimal" min="1" step="any" value="${v}"></label><select class="dur-unit" aria-label="${esc(t('unit'))}">${['s', 'min', 'h'].map((x) => `<option value="${x}"${x === u ? ' selected' : ''}>${esc(t('unit.' + x))}</option>`).join('')}</select></div>`;
+}
+
+function ruleInner(g, idx) {
+  const trig = Core.TRIGGERS.map((k) => `<button type="button" class="seg-btn" data-trigger="${k}" aria-pressed="${g.trigger === k}"><svg class="ic"><use href="#i-${TRIGGER_ICON[k]}"/></svg><span>${esc(t('trigger.' + k))}</span></button>`).join('');
+  const acts = Core.ACTIONS.map((k) => `<button type="button" class="seg-btn" data-action="${k}" aria-pressed="${g.action === k}"><svg class="ic"><use href="#i-${ACTION_ICON[k]}"/></svg><span>${esc(t('action.' + k))}</span></button>`).join('');
+  const n = g.ins.length * g.outs.length;
+  return `
+    <div class="rule-top"><span class="rule-n">${esc(t('rule'))} ${idx + 1}</span>
+      <input class="rule-name" type="text" maxlength="${Core.LIMITS.nameLen}" value="${esc(g.name || '')}" placeholder="${esc(t('rule.name.ph'))}" aria-label="${esc(t('rule.name.ph'))}">
+      <span class="expands" title="${esc(t('expands', { n }))}">${esc(t('expands', { n }))}</span>
+      <span class="tools">
+        <button type="button" class="icon-btn" data-dup title="${esc(t('dup'))}" aria-label="${esc(t('dup'))}"><svg class="ic"><use href="#i-copy"/></svg></button>
+        <button type="button" class="icon-btn" data-del title="${esc(t('del'))}" aria-label="${esc(t('del'))}"><svg class="ic"><use href="#i-trash"/></svg></button>
+      </span></div>
+    <div class="half in">
+      <div class="half-h">${esc(t('when'))}</div>
+      ${chipsHTML('in', g)}
+      <div class="seg" role="group">${trig}</div>
+      <p class="hint">${esc(t('hint.' + g.trigger))}${g.ins.length > 1 ? ' ' + esc(t('multi.in')) : ''}</p>
+    </div>
+    <div class="link"><svg class="ic"><use href="#i-arrow"/></svg></div>
+    <div class="half out">
+      <div class="half-h">${esc(t('then'))}</div>
+      ${chipsHTML('out', g)}
+      <div class="seg" role="group">${acts}</div>
+      ${durHTML(g)}
+      <p class="hint">${esc(t('ahint.' + g.action))}${g.outs.length > 1 ? ' ' + esc(t('multi.out')) : ''}</p>
+    </div>`;
+}
+
+function focusKey(el) {
+  if (!el || !el.closest) return null;
+  const c = el.closest('.rule');
+  if (!c) return null;
+  const d = el.dataset || {};
+  const sel = d.trigger ? `[data-trigger="${d.trigger}"]` : d.action ? `[data-action="${d.action}"]` : d.pick ? `.chip-add[data-pick="${d.pick}"]` : d.rm !== undefined ? `.chip-add[data-pick="${d.side}"]` : 'dup' in d ? '[data-dup]' : el.classList.contains('dur-unit') ? '.dur-unit' : null;
+  return sel ? { uid: c.dataset.uid, sel } : null;
+}
+function restoreFocus(k) {
+  if (!k) return;
+  const c = document.getElementById('rule-' + k.uid);
+  const el = c && c.querySelector(k.sel);
+  if (el) el.focus({ preventScroll: true });
+}
+
+function renderList() {
+  const fk = focusKey(document.activeElement);
+  const rows = [];
+  state.groups.forEach((g, idx) => { if (matches(g)) rows.push(`<article class="rule" id="rule-${g.uid}" data-uid="${g.uid}">${ruleInner(g, idx)}</article>`); });
+  $('#list').innerHTML = rows.join('');
+  listStale = false;
+  updateChrome();
+  restoreFocus(fk);
+}
+function renderCard(g) {
+  const card = document.getElementById('rule-' + g.uid);
+  if (!card) return;
+  const fk = focusKey(document.activeElement);
+  card.innerHTML = ruleInner(g, state.groups.indexOf(g));
+  restoreFocus(fk);
+}
+function scrollToRule(uid, focusPick) {
+  const el = document.getElementById('rule-' + uid);
+  if (!el) return;
+  el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+  if (focusPick) { const b = el.querySelector('.rule-name'); if (b) b.focus({ preventScroll: true }); }
+}
+
+const list = $('#list');
+list.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  const card = e.target.closest('.rule');
+  if (!b || !card) return;
+  const g = byUid(+card.dataset.uid);
+  if (!g) return;
+  if (b.dataset.pick) { openPicker(b.dataset.pick, g.uid); return; }
+  if (b.dataset.rm !== undefined) {
+    const key = b.dataset.side === 'in' ? 'ins' : 'outs';
+    const n = +b.dataset.rm;
+    mutate(() => { g[key] = g[key].filter((x) => x !== n); });
+    renderCard(g);
+    return;
+  }
+  if (b.dataset.trigger) { mutate(() => { g.trigger = b.dataset.trigger; }); renderCard(g); return; }
+  if (b.dataset.action) {
+    mutate(() => {
+      g.action = b.dataset.action;
+      if (Core.isTimer(g.action)) { if (!g.seconds) { g.seconds = 300; g.unit = 'min'; } } else { g.seconds = null; g.unit = null; }
+    });
+    renderCard(g);
+    return;
+  }
+  if ('dup' in b.dataset) {
+    const copy = newGroup(full(g));
+    mutate(() => { state.groups.splice(state.groups.indexOf(g) + 1, 0, copy); });
+    scrollToRule(copy.uid);
+    return;
+  }
+  if ('del' in b.dataset) {
+    mutate(() => { state.groups.splice(state.groups.indexOf(g), 1); });
+    toast(t('deleted'), { label: t('undo.do'), fn: undo });
+  }
+});
+list.addEventListener('input', (e) => {
+  const card = e.target.closest('.rule');
+  if (!card) return;
+  const g = byUid(+card.dataset.uid);
+  if (e.target.classList.contains('rule-name')) {
+    const v = e.target.value.trim();
+    mutate(() => { g.name = v; }, 'gname' + g.uid);
+    return;
+  }
+  if (!e.target.classList.contains('dur-val')) return;
+  const v = parseFloat(e.target.value);
+  mutate(() => { g.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[unitOf(g)]) : null; }, 'dur' + g.uid);
+});
+list.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('dur-unit')) return;
+  const card = e.target.closest('.rule');
+  const g = byUid(+card.dataset.uid);
+  const v = parseFloat($('.dur-val', card).value);
+  mutate(() => { g.unit = e.target.value; g.seconds = isFinite(v) && v > 0 ? Math.round(v * UNIT[g.unit]) : null; });
+  renderCard(g);
+});
+$('#checks').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-goto]');
+  if (!b || !b.dataset.goto) return;
+  if (state.filter) { state.filter = ''; $('#search').value = ''; renderList(); }
+  scrollToRule(+b.dataset.goto);
+});
+
+/* ---------- adding ---------- */
+function freeList(kind, count) {
+  const max = kind === 'in' ? Core.LIMITS.inputs : Core.LIMITS.outputs;
+  const key = kind === 'in' ? 'ins' : 'outs';
+  const used = new Set();
+  state.groups.forEach((g) => g[key].forEach((n) => used.add(n)));
+  const out = [];
+  for (let i = 0; i < max && out.length < count; i++) if (!used.has(i)) out.push(i);
+  let i = 0;
+  while (out.length < count) { if (!out.includes(i % max)) out.push(i % max); i++; }
+  return out;
+}
+function clearFilter() { if (state.filter) { state.filter = ''; $('#search').value = ''; } }
+
+function addRule() {
+  clearFilter();
+  const g = newGroup({ ins: freeList('in', 1), outs: freeList('out', 1) });
+  mutate(() => { state.groups.push(g); });
+  scrollToRule(g.uid, true);
+}
+const PRESETS = {
+  switch: () => [{ trigger: 'both', action: 'toggle' }],
+  push: () => [{ trigger: 'rising', action: 'toggle' }],
+  twoin: () => [{ trigger: 'both', action: 'toggle', nIn: 2 }],
+  hold: () => [{ trigger: 'rising', action: 'on' }, { trigger: 'falling', action: 'off' }],
+  timer: () => [{ trigger: 'rising', action: 'on_for', seconds: 300, unit: 'min' }],
+  alloff: () => [{ trigger: 'rising', action: 'off', nOut: 3 }]
+};
+function addPreset(key) {
+  clearFilter();
+  const specs = PRESETS[key]();
+  const nIn = Math.max(...specs.map((s) => s.nIn || 1));
+  const nOut = Math.max(...specs.map((s) => s.nOut || 1));
+  const ins = freeList('in', nIn), outs = freeList('out', nOut);
+  const made = specs.map((s) => { const o = { ...s }; delete o.nIn; delete o.nOut; return newGroup({ ins: ins.slice(), outs: outs.slice(), ...o }); });
+  mutate(() => { made.forEach((g) => state.groups.push(g)); });
+  scrollToRule(made[0].uid, true);
+}
+$('#addBtn').addEventListener('click', addRule);
+$('#emptyAdd').addEventListener('click', addRule);
+const presetMenu = $('#presetMenu');
+$('#presetPop').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-preset]');
+  if (!b) return;
+  presetMenu.open = false;
+  addPreset(b.dataset.preset);
+});
+document.addEventListener('click', (e) => { if (presetMenu.open && !presetMenu.contains(e.target)) presetMenu.open = false; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && presetMenu.open) { presetMenu.open = false; $('summary', presetMenu).focus(); } });
+
+$('#sortBtn').addEventListener('click', () => {
+  mutate(() => { state.groups.sort((a, b) => (a.ins[0] ?? 99) - (b.ins[0] ?? 99) || (a.outs[0] ?? 99) - (b.outs[0] ?? 99)); });
+  toast(t('sorted'));
+});
+$('#undoBtn').addEventListener('click', undo);
+$('#redoBtn').addEventListener('click', redo);
+$('#search').addEventListener('input', (e) => { state.filter = e.target.value; renderList(); });
+
+/* ---------- picker dialog (multi-select, shown in blocks of 16) ---------- */
+const picker = $('#picker');
+let pickCtx = null;
+function maxOf(kind) { return kind === 'in' ? Core.LIMITS.inputs : Core.LIMITS.outputs; }
+
+function openPicker(kind, uid) {
+  const g = byUid(uid);
+  if (!g) return;
+  const key = kind === 'in' ? 'ins' : 'outs';
+  const usage = new Array(maxOf(kind)).fill(0);
+  state.groups.forEach((x) => { if (x !== g) x[key].forEach((n) => { usage[n]++; }); });
+  pickCtx = { kind, uid, key, sel: new Set(g[key]), start: g[key].slice(), usage };
+  $('#pickerTitle').textContent = t(kind === 'in' ? 'pick.inputs' : 'pick.outputs');
+  $('#pickerSub').textContent = t('pick.sub.' + kind);
+  const blocks = [];
+  for (let b = 0; b < maxOf(kind) / BLOCK; b++) {
+    const tiles = Array.from({ length: BLOCK }, (_, k) => {
+      const i = b * BLOCK + k;
+      const nm = labelOf(kind, i);
+      const tip = [t(kind === 'in' ? 'input' : 'output') + ' ' + (i + 1), nm, usage[i] ? t('used', { n: usage[i] }) : ''].filter(Boolean).join(' – ');
+      return `<button type="button" class="tile" data-n="${i}" aria-pressed="false" title="${esc(tip)}"><b>${i + 1}</b><small>${esc(nm)}</small>${usage[i] ? `<i class="used">${usage[i]}</i>` : ''}</button>`;
+    }).join('');
+    blocks.push(`<section class="blk" data-b="${b}"><div class="blk-h"><h3>${esc(t('block', { n: b + 1 }))}</h3><span class="blk-r">${esc(t('range.' + kind, { a: b * BLOCK + 1, b: (b + 1) * BLOCK }))}</span><button type="button" class="btn small" data-blk="${b}"></button></div><div class="tiles">${tiles}</div></section>`);
+  }
+  $('#pickerGrid').innerHTML = blocks.join('');
+  picker.className = kind;
+  paintPicker();
+  picker.showModal();
+  const first = $('.tile[aria-pressed="true"]', picker) || $('.tile', picker);
+  if (first) first.focus({ preventScroll: true });
+}
+function paintPicker() {
+  if (!pickCtx) return;
+  $$('#pickerGrid .tile').forEach((el) => { el.setAttribute('aria-pressed', String(pickCtx.sel.has(+el.dataset.n))); });
+  $$('#pickerGrid .blk').forEach((blk) => {
+    const b = +blk.dataset.b;
+    const all = Array.from({ length: BLOCK }, (_, k) => pickCtx.sel.has(b * BLOCK + k)).every(Boolean);
+    $('[data-blk]', blk).textContent = t(all ? 'sel.none' : 'sel.block');
+  });
+  $('#pickCount').textContent = t('sel.count', { n: pickCtx.sel.size });
+}
+$('#pickerGrid').addEventListener('click', (e) => {
+  if (!pickCtx) return;
+  const tile = e.target.closest('.tile');
+  const blkBtn = e.target.closest('[data-blk]');
+  if (tile) {
+    const n = +tile.dataset.n;
+    if (pickCtx.sel.has(n)) pickCtx.sel.delete(n); else pickCtx.sel.add(n);
+  } else if (blkBtn) {
+    const b = +blkBtn.dataset.blk;
+    const nums = Array.from({ length: BLOCK }, (_, k) => b * BLOCK + k);
+    const all = nums.every((n) => pickCtx.sel.has(n));
+    nums.forEach((n) => { if (all) pickCtx.sel.delete(n); else pickCtx.sel.add(n); });
+  } else return;
+  paintPicker();
+});
+$('#pickClear').addEventListener('click', () => { if (pickCtx) { pickCtx.sel.clear(); paintPicker(); } });
+picker.addEventListener('close', () => {
+  const ctx = pickCtx;
+  pickCtx = null;
+  if (!ctx) return;
+  const g = byUid(ctx.uid);
+  const now = sortNum([...ctx.sel]);
+  if (!g || JSON.stringify(now) === JSON.stringify(sortNum(ctx.start))) return;
+  mutate(() => { g[ctx.key] = now; });
+  renderCard(g);
+});
+
+$$('dialog').forEach((d) => {
+  d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+});
+
+/* ---------- names tab ---------- */
+function renderNames() {
+  const mk = (kind, max) => {
+    let h = '';
+    for (let b = 0; b < max / BLOCK; b++) {
+      h += `<div class="name-blk"><h4>${esc(t('block', { n: b + 1 }))} <span>${esc(t('range.' + kind, { a: b * BLOCK + 1, b: (b + 1) * BLOCK }))}</span></h4><div class="name-grid">`;
+      for (let k = 0; k < BLOCK; k++) {
+        const i = b * BLOCK + k;
+        h += `<label class="name-row"><span class="name-n">${i + 1}</span><input type="text" maxlength="${Core.LIMITS.labelLen}" data-kind="${kind}" data-n="${i}" value="${esc(labelOf(kind, i))}" placeholder="${esc(t('names.ph'))}" aria-label="${esc(t(kind === 'in' ? 'input' : 'output'))} ${i + 1}"></label>`;
+      }
+      h += '</div></div>';
+    }
+    return h;
+  };
+  $('#namesIn').innerHTML = mk('in', Core.LIMITS.inputs);
+  $('#namesOut').innerHTML = mk('out', Core.LIMITS.outputs);
+}
+$('#view-names').addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el.dataset || !el.dataset.kind) return;
+  const kind = el.dataset.kind, n = +el.dataset.n, v = el.value.trim();
+  mutate(() => { if (v) state.labels[kind][n] = v; else delete state.labels[kind][n]; }, 'name' + kind + n);
+  listStale = true;
+});
+$('#namesClear').addEventListener('click', () => {
+  mutate(() => { state.labels = { in: {}, out: {} }; });
+  renderNames();
+});
+
+/* ---------- file tab ---------- */
+function renderFile() {
+  const text = currentText();
+  $('#json').textContent = text;
+  $('#fileMeta').textContent = t('file.meta', { n: state.groups.length, f: flatCount(), kb: (textBytes(text) / 1024).toFixed(1) }) + (state.includeLabels ? ' · ' + t('file.labelsHint') : '');
+  if (document.activeElement !== $('#fileName')) $('#fileName').value = state.fileName;
+  $('#incLabels').checked = state.includeLabels;
+}
+$('#fileName').addEventListener('input', (e) => { state.fileName = e.target.value; scheduleSave(); });
+$('#incLabels').addEventListener('change', (e) => { state.includeLabels = e.target.checked; changed(false); });
+$('#copyBtn').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(currentText()); toast(t('file.copied')); }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($('#json')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+});
+
+/* ---------- tabs ---------- */
+function showTab(name) {
+  state.tab = name;
+  $$('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['rules', 'test', 'names', 'file'].forEach((n) => { $('#view-' + n).hidden = n !== name; });
+  if (name === 'rules' && listStale) renderList();
+  if (name === 'names') renderNames();
+  if (name === 'file') renderFile();
+  if (name === 'test') buildSim(); else stopSim();
+  updateChrome();
+}
+$$('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ---------- test (simulator) ---------- */
+let sim = null, simTimer = null;
+const simMode = {};
+const flatRules = () => Core.expand(state.groups.map(plainG));
+function usedList(kind) { return sortNum(flatRules().map((r) => r[kind])); }
+function stopSim() { clearInterval(simTimer); simTimer = null; }
+function buildSim() {
+  const ins = usedList('in'), outs = usedList('out');
+  const rules = flatRules();
+  sim = new Core.Sim(rules);
+  $('#simEmpty').hidden = rules.length > 0;
+  $('#simCols').hidden = rules.length === 0;
+  ins.forEach((i) => { if (!(i in simMode)) simMode[i] = rules.some((r) => r.in === i && r.trigger === 'both') ? 'switch' : 'push'; });
+  $('#simIn').innerHTML = ins.map((i) => {
+    const nm = labelOf('in', i);
+    return `<div class="sim-in" data-i="${i}"><button type="button" class="sim-btn" aria-pressed="false"><b><svg class="ic"><use href="#i-${simMode[i] === 'switch' ? 'switch' : 'press'}"/></svg>${esc(t('input'))} ${i + 1}</b><small>${esc(nm)}</small></button><button type="button" class="sim-mode" aria-pressed="${simMode[i] === 'switch'}" title="${esc(t('test.mode'))}" aria-label="${esc(t('test.mode'))}"><svg class="ic"><use href="#i-lock"/></svg></button></div>`;
+  }).join('');
+  $('#simOut').innerHTML = outs.map((o) => {
+    const nm = labelOf('out', o);
+    return `<div class="lamp" data-o="${o}"><span class="bulb"><svg class="ic"><use href="#i-bulb"/></svg></span><span><b>${esc(t('output'))} ${o + 1}</b><small>${esc(nm)}</small><small class="timer"></small></span></div>`;
+  }).join('');
+  paintSim();
+  if (!simTimer && state.tab === 'test') simTimer = setInterval(() => { if (sim.tick(performance.now()) || sim.timers.size) paintSim(); }, 100);
+}
+function paintSim() {
+  if (!sim) return;
+  const now = performance.now();
+  $$('#simIn .sim-in').forEach((el) => {
+    $('.sim-btn', el).setAttribute('aria-pressed', String(sim.inputs[+el.dataset.i]));
+  });
+  $$('#simOut .lamp').forEach((el) => {
+    const o = +el.dataset.o;
+    const on = sim.outputs[o];
+    el.classList.toggle('on', on);
+    $('.bulb use', el).setAttribute('href', on ? '#i-bulb-on' : '#i-bulb');
+    const tm = sim.timers.get(o);
+    $('.timer', el).textContent = tm ? t('test.left', { s: Math.max(0, Math.ceil((tm.end - now) / 1000)) }) : '';
+  });
+}
+(function wireSim() {
+  const host = $('#simIn');
+  const press = (el, down) => { sim.setInput(+el.dataset.i, down, performance.now()); paintSim(); };
+  host.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('.sim-btn');
+    if (!b) return;
+    const el = b.closest('.sim-in'), i = +el.dataset.i;
+    if (simMode[i] === 'switch') { press(el, !sim.inputs[i]); return; }
+    try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    press(el, true);
+  });
+  const release = (e) => {
+    const b = e.target.closest('.sim-btn');
+    if (!b) return;
+    const el = b.closest('.sim-in');
+    if (simMode[+el.dataset.i] === 'push' && sim.inputs[+el.dataset.i]) press(el, false);
+  };
+  host.addEventListener('pointerup', release);
+  host.addEventListener('pointercancel', release);
+  host.addEventListener('keydown', (e) => {
+    const b = e.target.closest('.sim-btn');
+    if (!b || e.repeat || (e.key !== ' ' && e.key !== 'Enter')) return;
+    e.preventDefault();
+    const el = b.closest('.sim-in'), i = +el.dataset.i;
+    press(el, simMode[i] === 'switch' ? !sim.inputs[i] : true);
+  });
+  host.addEventListener('keyup', (e) => {
+    const b = e.target.closest('.sim-btn');
+    if (!b || (e.key !== ' ' && e.key !== 'Enter')) return;
+    const el = b.closest('.sim-in');
+    if (simMode[+el.dataset.i] === 'push') press(el, false);
+  });
+  host.addEventListener('click', (e) => {
+    const m = e.target.closest('.sim-mode');
+    if (!m) return;
+    const i = +m.closest('.sim-in').dataset.i;
+    simMode[i] = simMode[i] === 'switch' ? 'push' : 'switch';
+    const keep = sim.outputs.slice();
+    buildSim();
+    sim.outputs = keep;
+    paintSim();
+  });
+  host.addEventListener('contextmenu', (e) => e.preventDefault());
+  $('#simReset').addEventListener('click', buildSim);
+})();
+
+/* ---------- open / new / example / download ---------- */
+function loadParsed(res, name) {
+  mutate(() => {
+    state.groups = res.groups.map((g) => newGroup({ ...g, unit: Core.isTimer(g.action) ? bestUnit(g.seconds) : null }));
+    state.labels = res.labels;
+    state.fileName = name || state.fileName;
+    state.includeLabels = true;
+  });
+  state.dirty = false;
+  clearFilter();
+  showTab('rules');
+  let msg = t('opened', { name: name || 'file', n: res.groups.length });
+  if (res.skipped) msg += ' ' + t('skipped', { k: res.skipped });
+  toast(msg, { label: t('undo.do'), fn: undo });
+}
+function openText(text, name) {
+  const res = Core.parseFile(text);
+  if (res.error) { toast(t('err.' + res.error)); return; }
+  loadParsed(res, name);
+}
+function readFile(file) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => openText(String(fr.result), file.name);
+  fr.readAsText(file);
+}
+$('#openBtn').addEventListener('click', () => $('#fileInput').click());
+$('#emptyOpen').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', (e) => { readFile(e.target.files[0]); e.target.value = ''; });
+
+$('#newBtn').addEventListener('click', () => {
+  if (!state.groups.length && !Object.keys(state.labels.in).length && !Object.keys(state.labels.out).length) return;
+  mutate(() => { state.groups = []; state.labels = { in: {}, out: {} }; state.fileName = 'fallback.json'; });
+  state.dirty = false;
+  clearFilter();
+  showTab('rules');
+  toast(t('new.done'), { label: t('undo.do'), fn: undo });
+});
+
+function loadExample() {
+  const names = t('example.groups');
+  const G = (i, ins, trigger, outs, action, seconds) => ({ name: names[i], ins, trigger, outs, action, seconds: seconds || null });
+  const groups = [
+    G(0, [0], 'both', [0], 'toggle'),
+    G(1, [1, 7], 'rising', [1], 'toggle'),
+    G(2, [2], 'rising', [2], 'on'),
+    G(3, [2], 'falling', [2], 'off'),
+    G(4, [3], 'rising', [3], 'on_for', 10),
+    G(5, [4], 'rising', [4], 'off_for', 10),
+    G(6, [5], 'rising', [0, 1, 2, 3], 'off')
+  ];
+  loadParsed({ groups, labels: { in: { ...t('example.labelsIn') }, out: { ...t('example.labelsOut') } }, skipped: 0 }, 'fallback-example.json');
+  state.dirty = true;
+}
+$('#emptyExample').addEventListener('click', loadExample);
+
+function cleanName(n) {
+  let s = (n || '').trim().replace(/[\\/:*?"<>|]+/g, '-');
+  if (!s) s = 'fallback';
+  if (!/\.json$/i.test(s)) s += '.json';
+  return s;
+}
+function download() {
+  if (!state.groups.length) { toast(t('err.empty')); return; }
+  if (lastIssues.some((i) => i.level === 'error')) { toast(t('err.fix')); return; }
+  const name = cleanName(state.fileName);
+  const blob = new Blob([currentText()], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  state.dirty = false;
+  $('#dlSaved').textContent = t('dl.saved', { name });
+  $('#dlDialog').showModal();
+  const ip = $('#ipInput');
+  if (!ip.value) ip.value = store.get('logicasa.fallback.ip') || '';
+  updateCtl();
+}
+$('#dlBtn').addEventListener('click', download);
+
+function updateCtl() {
+  const v = $('#ipInput').value.trim();
+  const ok = /^[a-z0-9]([a-z0-9.\-]*[a-z0-9])?(:\d{1,5})?$/i.test(v);
+  const a = $('#openCtl');
+  a.setAttribute('aria-disabled', String(!ok));
+  a.href = ok ? 'http://' + v + '/fallback' : '#';
+  if (ok) store.set('logicasa.fallback.ip', v);
+}
+$('#ipInput').addEventListener('input', updateCtl);
+$('#openCtl').addEventListener('click', (e) => { if ($('#openCtl').getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+
+/* ---------- drag and drop ---------- */
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; $('#drop').hidden = false; } });
+window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop').hidden = true; });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  $('#drop').hidden = true;
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) { showPage('editor'); readFile(f); }
+});
+
+/* ---------- keyboard + leaving ---------- */
+document.addEventListener('keydown', (e) => {
+  if (page !== 'editor') return;
+  const mod = e.ctrlKey || e.metaKey;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || ''));
+  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); download(); return; }
+  if (!mod || typing) return;
+  if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+});
+window.addEventListener('beforeunload', (e) => { if (state.dirty && state.groups.length) { e.preventDefault(); e.returnValue = t('leave'); } });
+
+/* ---------- language ---------- */
+$('#langBtn').addEventListener('click', () => {
+  lang = lang === 'en' ? 'nl' : 'en';
+  store.set('logicasa.lang', lang);
+  applyI18n();
+  if (state.tab === 'file') renderFile();
+  if (state.tab === 'test') buildSim();
+  paintVariant();
+});
+
+/* ---------- pages (install / editor) ---------- */
+let variant = 'ethernet';
+function showPage(name) {
+  page = name === 'editor' ? 'editor' : 'install';
+  $('#page-install').hidden = page !== 'install';
+  $('#page-editor').hidden = page !== 'editor';
+  $('#editorActions').hidden = page !== 'editor';
+  if (page === 'editor') $('#navEditor').setAttribute('aria-current', 'page'); else $('#navEditor').removeAttribute('aria-current');
+  if (page === 'install') $('#navInstall').setAttribute('aria-current', 'page'); else $('#navInstall').removeAttribute('aria-current');
+  document.title = t(page === 'install' ? 'inst.title' : 'app.title') + ' – Logi.casa';
+  if (location.hash !== '#' + page) { try { history.replaceState(null, '', '#' + page); } catch (e) { /* ignore */ } }
+  window.scrollTo(0, 0);
+  if (page === 'editor') { if (listStale && state.tab === 'rules') renderList(); updateChrome(); }
+}
+window.addEventListener('hashchange', () => showPage(location.hash === '#editor' ? 'editor' : 'install'));
+
+function paintVariant() {
+  $$('#variantSeg .seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.variant === variant)));
+  $('#variantHint').textContent = t('inst.hint.' + variant);
+  $('#espBtn').setAttribute('manifest', 'firmware/' + variant + '/manifest.json');
+  const el = $('#fwVersion');
+  el.textContent = '';
+  fetch('firmware/' + variant + '/manifest.json', { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no manifest'))))
+    .then((m) => { if (variant === $('#variantSeg [aria-pressed=true]').dataset.variant) el.textContent = m.version ? t('inst.version', { v: m.version }) : ''; })
+    .catch(() => { el.textContent = t('inst.noversion'); });
+}
+$('#variantSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-variant]');
+  if (!b) return;
+  variant = b.dataset.variant;
+  paintVariant();
+});
+
+/* ---------- start ---------- */
+(function init() {
+  let restored = false;
+  const raw = store.get('logicasa.fallback.draft2');
+  if (raw) {
+    try {
+      const d = JSON.parse(raw);
+      const hasLabels = d.labels && (Object.keys(d.labels.in || {}).length || Object.keys(d.labels.out || {}).length);
+      if ((d.groups && d.groups.length) || hasLabels) {
+        state.groups = (d.groups || []).map((g) => newGroup(g));
+        state.labels = { in: (d.labels && d.labels.in) || {}, out: (d.labels && d.labels.out) || {} };
+        state.fileName = d.fileName || state.fileName;
+        state.includeLabels = d.includeLabels !== false;
+        state.dirty = true;
+        restored = true;
+      }
+    } catch (e) { /* ignore a broken draft */ }
+  }
+  applyI18n();
+  showTab('rules');
+  showPage(location.hash === '#editor' ? 'editor' : 'install');
+  paintVariant();
+  if (restored) toast(t('restored'), { label: t('startover'), fn: () => { mutate(() => { state.groups = []; state.labels = { in: {}, out: {} }; }); state.dirty = false; } });
+})();
+
+})();
+</script>
+</body>
+</html>

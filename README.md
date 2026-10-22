@@ -8,7 +8,7 @@
 
 <p align="center">
   Open ESPHome firmware for the <a href="https://www.logi.casa/shop/esp-home-controller/">Logi.casa ESP Home Controller</a>:<br>
-  48 inputs, 32 outputs, wired Ethernet, native Home Assistant integration, and a built-in <b>offline fallback</b>.
+  48 inputs, 32 outputs, Ethernet or WiFi, native Home Assistant integration, and a built-in <b>offline fallback</b>.
 </p>
 
 ---
@@ -17,6 +17,7 @@
 
 - [What is it?](#what-is-it)
 - [Hardware at a glance](#hardware-at-a-glance)
+- [Install the firmware](#install-the-firmware)
 - [Quick start](#quick-start)
 - [Offline fallback](#offline-fallback)
   - [How it works](#how-it-works)
@@ -38,7 +39,7 @@
 ## What is it?
 
 The **ESP Home Controller** is a DIN-rail controller that puts 48 digital inputs and 32 digital outputs into
-[Home Assistant](https://www.home-assistant.io/) over a wired Ethernet connection. It runs
+[Home Assistant](https://www.home-assistant.io/) over Ethernet (or WiFi, with the WiFi firmware). It runs
 [ESPHome](https://esphome.io/) on an ESP32, so it is easy to adopt, update over the network, and reflash with your own firmware.
 
 This repository contains the firmware configuration and the **fallback engine**. The fallback engine keeps your
@@ -55,7 +56,7 @@ to a set of simple rules that you defined in advance (for example *"wall button 
 | **Inputs** | 48 digital inputs, 24 VDC (active on a positive signal) |
 | **Outputs** | 32 digital outputs, 24 VDC, max. 500 mW per channel (switch to ground) |
 | **Power** | 24 VDC, 15 W max. (below 1 W with no active channels) |
-| **Network** | Wired Ethernet (RJ45) |
+| **Network** | Ethernet (RJ45), or WiFi with the WiFi firmware variant |
 | **Processor** | ESP32 |
 | **In Home Assistant** | 48 binary sensors, 32 lights, a status LED light, IP and MAC address sensors |
 
@@ -67,13 +68,28 @@ Hardware installation (wiring, power, network): <https://www.logi.casa/esp-home-
 
 ---
 
+## Install the firmware
+
+Controllers are delivered with the firmware already installed. To install or reinstall it, use the installer page:
+
+**<https://syntos.github.io/esp-controller-test/>**
+
+1. Choose your variant: **Ethernet** (network cable) or **WiFi**.
+2. Open the casing, connect the mainboard to your computer with a data-capable micro-USB cable, and put the **DIP switch in FLASH mode**.
+3. Click **Install firmware** and choose the serial port. Use Chrome or Edge on a computer.
+4. When it has finished, set the DIP switch back. With the WiFi variant, the page then asks for your WiFi name and password.
+
+The same page contains the [fallback editor](#the-fallback-file).
+
+---
+
 ## Quick start
 
 You need a running Home Assistant installation with the **ESPHome Device Builder** add-on (ESPHome 2026.9 or newer).
 Wiring the controller (power, inputs, outputs, network cable) is described in the
 [hardware quick start](https://www.logi.casa/esp-home-controller-quick-start/).
 
-1. **Connect and power the controller.** Plug in the network cable and apply 24 VDC. The status LED lights up red while starting.
+1. **Connect and power the controller.** Plug in the network cable (Ethernet variant) and apply 24 VDC. The status LED lights up red while starting.
 2. **Open the ESPHome Device Builder** in Home Assistant. The controller appears as a discovered device. Click **Take Control**.
 3. **Give it a unique name** (add a number if you have several controllers) and let ESPHome install the latest firmware.
    ESPHome creates a **unique encryption key** for your controller during this step. You never have to type or copy it.
@@ -166,7 +182,7 @@ The visual editor lets you give inputs, outputs and rules a name, and lets one r
 
 The controller only ever acts on `rules` (every input and output pair of a group becomes one entry there, so the 256 limit counts these entries). `groups` and `labels` are only used by the editor. The controller stores them next to the rules (up to 16 KB) and returns them with **Download current configuration**, so you can edit your setup from any computer.
 
-> **Easiest way:** build the file visually with the [Fallback editor](https://syntos.github.io/esp-controller-test/). Pick inputs and outputs, test the rules in the built-in simulator, and download the file. You can also open an existing file to change it.
+> **Easiest way:** build the file visually with the [Fallback editor](https://syntos.github.io/esp-controller-test/#editor). Pick inputs and outputs, test the rules in the built-in simulator, and download the file. You can also open an existing file to change it.
 
 ### Example
 
@@ -232,16 +248,17 @@ If you use this input as the reset button, do not use it in fallback rules (`"in
 ## Updating the firmware
 
 Updates are installed from the **ESPHome Device Builder** in Home Assistant: open your controller and click **Install**.
-Updates travel over the network (Ethernet) and are protected by your controller's encryption key.
+Updates travel over the network and are protected by your controller's encryption key. Your configuration follows the
+release it was created with, so a new release only reaches you when you choose to update.
 
-If a controller ever becomes unreachable, you can reflash it over **micro-USB**: put the DIP switch in flash mode,
-connect the cable, flash with [ESPHome Web](https://web.esphome.io/) (Chrome or Edge), set the switch back, and restart.
+If a controller ever becomes unreachable, reflash it over **micro-USB** with the [installer page](#install-the-firmware).
+Your fallback rules and password are kept, because the installer does not erase the controller's settings memory.
 
 ---
 
 ## Security
 
-- **Home Assistant link:** the connection between the controller and Home Assistant is encrypted with a unique key per controller, created when you take control of it.
+- **Home Assistant link:** after you take control, the connection is encrypted with a unique key per controller. Before that, a controller uses a public factory key that is the same for every unit, so take control right after installing.
 - **Fallback page:** it is protected by a password, but runs over plain HTTP. Use it **only on your local network**. Never forward its port to the internet.
 - **Physical access matters:** anyone with access to the reset button or the USB port can reset or reflash the controller.
 - **No shared secrets:** this repository contains no keys or passwords, and none should ever be committed to it.
@@ -252,7 +269,7 @@ connect the cable, flash with [ESPHome Web](https://web.esphome.io/) (Chrome or 
 
 | Problem | What to check |
 |---|---|
-| The LED stays **red** | The controller has no network. Check the network cable and your router. |
+| The LED stays **red** | The controller has no network. Check the network cable and your router. With the WiFi variant, enter your WiFi details again via the installer page. |
 | The LED is **purple** or **orange** | The controller cannot reach Home Assistant. Check that Home Assistant is running and on the same network. |
 | Home Assistant asks for an **encryption key** | Open the controller in the ESPHome Device Builder, choose *Show API key*, and paste it in. |
 | `/fallback` does not open | Use `http://`, not `https://`. Check the IP address and that you are on the same network. |
@@ -267,23 +284,40 @@ connect the cable, flash with [ESPHome Web](https://web.esphome.io/) (Chrome or 
 
 ```
 .
-├── esp-controller.yaml            ESPHome package: hardware, entities, fallback setup
+├── esp-controller-ethernet.yaml   Ready-to-use config, Ethernet variant (generated)
+├── esp-controller-wifi.yaml       Ready-to-use config, WiFi variant (generated)
+├── src/
+│   ├── common.yaml                Shared hardware, entities and fallback setup
+│   ├── network-ethernet.yaml      Ethernet specifics
+│   └── network-wifi.yaml          WiFi specifics
 ├── components/
 │   └── fallback_engine/           The fallback engine (ESPHome external component)
-├── example/
-│   └── customer-config.yaml       Example configuration with your own secrets
-├── docs/
-│   └── index.html                 Fallback editor (served by GitHub Pages)
+├── site/                          The website: installer and fallback editor
+├── tools/                         Generators and checks
+├── compat/                        Home Assistant entity names that must never change
+├── example/customer-config.yaml   Example of a personal configuration
+├── project.json                   Version, repository, ESPHome version
 ├── fallback-example.json          Small fallback example
 ├── fallback-test.json             Fallback example that covers every trigger and action
-├── secrets.yaml.example           Template for your own secrets file
-├── LICENSE                        MIT license
-└── assets/
-    └── logo.png
+└── .github/workflows/             Build and publish
 ```
 
-`esp-controller.yaml` is the shared package. It deliberately contains **no secrets**. When you take control of a controller in ESPHome, it
-generates a small configuration of your own that points to this package and adds your own encryption key.
+The two `esp-controller-*.yaml` files are **generated** from `src/`. They contain **no private secrets**. When you take control of a
+controller in ESPHome, it generates a small configuration of your own that points to one of them and adds your own encryption key.
+
+---
+
+## Development
+
+```
+python tools/build_yaml.py        # regenerate esp-controller-*.yaml after editing src/
+python tools/check_entities.py    # make sure no Home Assistant entity was renamed or removed
+python tools/build_site.py        # regenerate site/index.html after editing site/index.template.html
+```
+
+Home Assistant builds entity IDs from the entity names, so renaming an input or output breaks users' automations.
+CI refuses such a change unless you deliberately accept it with `python tools/check_entities.py --update`.
+See [RELEASING.md](RELEASING.md) for how to publish a new version.
 
 ---
 

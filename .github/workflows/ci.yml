@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Generated YAML is up to date
+        run: python tools/build_yaml.py --check
+      - name: Home Assistant entity names did not change
+        run: python tools/check_entities.py
+
+  build:
+    name: Compile ${{ matrix.variant }}
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [ethernet, wifi]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: cfg
+        run: echo "esphome=$(python -c "import json;print(json.load(open('project.json'))['esphome_version'])")" >> "$GITHUB_OUTPUT"
+      - name: Generate the YAML that uses the components of this checkout
+        run: python tools/build_yaml.py --local --out build
+      - name: Compile
+        uses: esphome/build-action@v6
+        with:
+          yaml-file: build/esp-controller-${{ matrix.variant }}.yaml
+          esphome-version: ${{ steps.cfg.outputs.esphome }}

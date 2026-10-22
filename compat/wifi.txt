@@ -1,0 +1,88 @@
+binary_sensor: esp_INPUT_01
+binary_sensor: esp_INPUT_02
+binary_sensor: esp_INPUT_03
+binary_sensor: esp_INPUT_04
+binary_sensor: esp_INPUT_05
+binary_sensor: esp_INPUT_06
+binary_sensor: esp_INPUT_07
+binary_sensor: esp_INPUT_08
+binary_sensor: esp_INPUT_09
+binary_sensor: esp_INPUT_10
+binary_sensor: esp_INPUT_11
+binary_sensor: esp_INPUT_12
+binary_sensor: esp_INPUT_13
+binary_sensor: esp_INPUT_14
+binary_sensor: esp_INPUT_15
+binary_sensor: esp_INPUT_16
+binary_sensor: esp_INPUT_17
+binary_sensor: esp_INPUT_18
+binary_sensor: esp_INPUT_19
+binary_sensor: esp_INPUT_20
+binary_sensor: esp_INPUT_21
+binary_sensor: esp_INPUT_22
+binary_sensor: esp_INPUT_23
+binary_sensor: esp_INPUT_24
+binary_sensor: esp_INPUT_25
+binary_sensor: esp_INPUT_26
+binary_sensor: esp_INPUT_27
+binary_sensor: esp_INPUT_28
+binary_sensor: esp_INPUT_29
+binary_sensor: esp_INPUT_30
+binary_sensor: esp_INPUT_31
+binary_sensor: esp_INPUT_32
+binary_sensor: esp_INPUT_33
+binary_sensor: esp_INPUT_34
+binary_sensor: esp_INPUT_35
+binary_sensor: esp_INPUT_36
+binary_sensor: esp_INPUT_37
+binary_sensor: esp_INPUT_38
+binary_sensor: esp_INPUT_39
+binary_sensor: esp_INPUT_40
+binary_sensor: esp_INPUT_41
+binary_sensor: esp_INPUT_42
+binary_sensor: esp_INPUT_43
+binary_sensor: esp_INPUT_44
+binary_sensor: esp_INPUT_45
+binary_sensor: esp_INPUT_46
+binary_sensor: esp_INPUT_47
+binary_sensor: esp_INPUT_48
+button: Clear fallback rules
+button: Reboot esp
+button: Reset fallback password
+light: Status LED
+light: esp_CHANNEL_01
+light: esp_CHANNEL_02
+light: esp_CHANNEL_03
+light: esp_CHANNEL_04
+light: esp_CHANNEL_05
+light: esp_CHANNEL_06
+light: esp_CHANNEL_07
+light: esp_CHANNEL_08
+light: esp_CHANNEL_09
+light: esp_CHANNEL_10
+light: esp_CHANNEL_11
+light: esp_CHANNEL_12
+light: esp_CHANNEL_13
+light: esp_CHANNEL_14
+light: esp_CHANNEL_15
+light: esp_CHANNEL_16
+light: esp_CHANNEL_17
+light: esp_CHANNEL_18
+light: esp_CHANNEL_19
+light: esp_CHANNEL_20
+light: esp_CHANNEL_21
+light: esp_CHANNEL_22
+light: esp_CHANNEL_23
+light: esp_CHANNEL_24
+light: esp_CHANNEL_25
+light: esp_CHANNEL_26
+light: esp_CHANNEL_27
+light: esp_CHANNEL_28
+light: esp_CHANNEL_29
+light: esp_CHANNEL_30
+light: esp_CHANNEL_31
+light: esp_CHANNEL_32
+sensor: esp_WiFi Signal
+sensor: esp_WiFi Signal dB
+text_sensor: ESP IP Address
+text_sensor: ESP MAC Address
