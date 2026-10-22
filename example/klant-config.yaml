@@ -16,6 +16,8 @@ api:
   encryption:
     key: !secret api_key
 
+# OTA-updates gebruiken dezelfde sleutel als de API (ESPHome 2026.9 of nieuwer).
+# Geen "password:" naast "encryption:" zetten, dat kan niet gecombineerd worden.
 ota:
   - platform: esphome
-    password: !secret ota_password
+    encryption:
