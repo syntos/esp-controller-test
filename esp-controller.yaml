@@ -43,7 +43,7 @@ external_components:
       type: git
       url: https://github.com/${repo_user}/${repo_name}
       ref: main
-    refresh: 1d
+    refresh: always
     components: [fallback_engine]
 
 ethernet:
