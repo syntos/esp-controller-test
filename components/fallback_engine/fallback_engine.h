@@ -36,6 +36,7 @@ class FallbackEngine : public Component {
   void add_input(binary_sensor::BinarySensor *sensor);
   void add_output(light::LightState *light) { this->outputs_.push_back(light); }
   void set_reset_input(binary_sensor::BinarySensor *sensor);
+  void set_status_light(light::LightState *light) { this->status_light_ = light; }
   void set_disconnect_delay(uint32_t ms) { this->disconnect_delay_ = ms; }
   void set_reconnect_delay(uint32_t ms) { this->reconnect_delay_ = ms; }
   void set_port(uint16_t port) { this->port_ = port; }
@@ -100,7 +101,15 @@ class FallbackEngine : public Component {
   // physical reset
   bool reset_seen_first_{false};
   bool reset_pressing_{false};
+  bool reset_done_{false};
   uint32_t reset_press_start_{0};
+  uint32_t reset_blink_{0};
+  bool reset_blink_on_{false};
+  light::LightState *status_light_{nullptr};
+  light::LightColorValues saved_led_;
+  bool led_saved_{false};
+  void reset_led_feedback_(bool on, float r, float g, float b);
+  void reset_led_restore_();
 
   uint32_t disconnect_delay_{15000};
   uint32_t reconnect_delay_{10000};

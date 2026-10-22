@@ -15,6 +15,7 @@ CONF_OUTPUTS = "outputs"
 CONF_DISCONNECT_DELAY = "disconnect_delay"
 CONF_RECONNECT_DELAY = "reconnect_delay"
 CONF_RESET_INPUT = "reset_input"
+CONF_STATUS_LIGHT = "status_light"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -33,6 +34,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_PORT, default=80): cv.port,
         # Optional: a push-button input the customer can use to reset the password
         cv.Optional(CONF_RESET_INPUT): cv.use_id(binary_sensor.BinarySensor),
+        # Optional: a light used to give feedback while the reset input is held
+        cv.Optional(CONF_STATUS_LIGHT): cv.use_id(light.LightState),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -52,9 +55,13 @@ async def to_code(config):
         rst = await cg.get_variable(config[CONF_RESET_INPUT])
         cg.add(var.set_reset_input(rst))
 
+    if CONF_STATUS_LIGHT in config:
+        led = await cg.get_variable(config[CONF_STATUS_LIGHT])
+        cg.add(var.set_status_light(led))
+
     cg.add(var.set_disconnect_delay(config[CONF_DISCONNECT_DELAY]))
     cg.add(var.set_reconnect_delay(config[CONF_RECONNECT_DELAY]))
     cg.add(var.set_port(config[CONF_PORT]))
 
-    # ESPHome sluit ongebruikte ESP-IDF-onderdelen uit; de HTTP-server hebben we nodig.
+    # ESPHome excludes unused ESP-IDF components; we need the HTTP server.
     include_builtin_idf_component("esp_http_server")
