@@ -1,3 +1,5 @@
+import re
+
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor, light
@@ -17,6 +19,16 @@ CONF_RECONNECT_DELAY = "reconnect_delay"
 CONF_RESET_INPUT = "reset_input"
 CONF_STATUS_LIGHT = "status_light"
 CONF_EDITOR_URL = "editor_url"
+
+_URL_RE = re.compile(r"^https?://[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$")
+
+
+def _editor_url(value):
+    value = cv.string(value)
+    if not _URL_RE.match(value):
+        raise cv.Invalid("editor_url must be a plain http(s) URL without spaces or quotes")
+    return value
+
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -38,7 +50,7 @@ CONFIG_SCHEMA = cv.Schema(
         # Optional: a light used to give feedback while the reset input is held
         cv.Optional(CONF_STATUS_LIGHT): cv.use_id(light.LightState),
         # Optional: web address of the online fallback editor, shown as a button on the page
-        cv.Optional(CONF_EDITOR_URL): cv.All(cv.string, cv.Regex(r"^https?://[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$")),
+        cv.Optional(CONF_EDITOR_URL): _editor_url,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
