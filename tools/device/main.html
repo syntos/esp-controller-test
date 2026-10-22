@@ -1,0 +1,83 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#4EC3E0">
+<title>Fallback – Logi.casa</title>
+<style>__CSS__</style></head>
+<body data-title="title">
+__HEADER__
+<main class="wrap">
+<section class="intro"><h1 data-i="title"></h1><p data-i="intro"></p></section>
+<section class="card"><h2 data-i="st"></h2><div class="pills" id="pills"></div><p class="note" data-i="stNote"></p></section>
+<section class="card"><div class="card-h"><h2 data-i="cur"></h2><span class="pill off" id="cnt"></span></div><div class="rules" id="rules"></div></section>
+<section class="card"><h2 data-i="up"></h2>
+<label class="drop" id="drop"><input type="file" id="f" accept=".json,application/json"><b id="dt" data-i="drop"></b><span id="ds" data-i="or"></span></label>
+<div class="acts"><button class="btn primary" id="send" type="button" onclick="up()" data-i="send"></button>
+<a class="btn" href="/fallback/config" download="fallback.json" data-i="dl"></a>
+<button class="btn danger" type="button" onclick="document.getElementById('dlg').showModal()" data-i="clr"></button></div>
+<div class="msg" id="msg" hidden></div>
+<p class="note" data-i="edNote"></p>
+<div class="acts"><a class="btn small" id="ed" href="#" target="_blank" rel="noopener" hidden data-i="ed"></a></div></section>
+</main>
+<footer class="foot"><div class="wrap"><span data-i="foot"></span></div></footer>
+<dialog id="dlg"><h2 data-i="cq"></h2><p data-i="ct"></p><div class="acts"><button class="btn" type="button" onclick="document.getElementById('dlg').close()" data-i="cancel"></button><button class="btn danger" type="button" onclick="clr()" data-i="ok"></button></div></dialog>
+<script>
+__LANGJS__
+var cfg=null,st=null,file=null;
+function nm(side,i){var l=cfg&&cfg.labels&&cfg.labels[side]&&cfg.labels[side][i];return l||(t(side==='in'?'input':'output')+' '+(i+1))}
+function dur(s){if(s%3600===0)return s/3600+' h';if(s%60===0)return s/60+' min';return s+' s'}
+function act(a,s){var x=t('a'+a);return(a==='on_for'||a==='off_for')?x+' '+dur(s||0):x}
+function setMsg(txt,err){var m=$('#msg');m.textContent=txt;m.className=err?'msg err':'msg';m.hidden=!txt}
+function pill(cls,a,b){var p=el('span','pill '+cls,a);if(b){p.appendChild(document.createTextNode(' '));p.appendChild(el('small',null,b))}return p}
+function drawStatus(){
+var P=$('#pills');P.textContent='';
+if(!st)return;
+P.appendChild(pill(st.active?'warn':'ok',st.active?t('fb'):t('normal')));
+P.appendChild(pill(st.ha?'':'warn',t('ha'),st.ha?t('haOn'):t('haOff')));
+$('#cnt').textContent=t('rules')+': '+st.rules;
+var e=$('#ed');if(st.editor){e.href=st.editor+'#editor';e.hidden=false}}
+function items(){
+var r=cfg.rules||[],g=cfg.groups,n=0,o=[],i;
+if(g&&g.length){for(i=0;i<g.length;i++)n+=(g[i].in||[]).length*(g[i].out||[]).length;
+if(n===r.length){return g.map(function(x){return{name:x.name,ins:x.in||[],trigger:x.trigger,outs:x.out||[],action:x.action,seconds:x.seconds}})}}
+for(i=0;i<r.length;i++)o.push({name:'',ins:[r[i].in],trigger:r[i].trigger,outs:[r[i].out],action:r[i].action,seconds:r[i].seconds});
+return o}
+var ARROW='<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+function half(cls,head,idx,side,sub){
+var h=el('div','half '+cls);h.appendChild(el('div','half-h',head));
+var c=el('div','chips');idx.forEach(function(i){c.appendChild(el('span','chip',nm(side,i)))});h.appendChild(c);h.appendChild(el('div','sub',sub));return h}
+function drawRules(){
+var R=$('#rules');R.textContent='';
+if(!cfg)return;
+var it=items();
+if(!it.length){R.appendChild(el('div','empty',t('none')));return}
+it.forEach(function(x,k){
+var d=el('div','rule');d.appendChild(el('div','rule-n',x.name||(t('rule')+' '+(k+1))));
+d.appendChild(half('in',t('when'),x.ins,'in',t('t'+x.trigger)));
+var l=el('div','link');l.innerHTML=ARROW;d.appendChild(l);
+d.appendChild(half('out',t('then'),x.outs,'out',act(x.action,x.seconds)));
+R.appendChild(d)})}
+function onLang(){drawStatus();drawRules();pickText()}
+window.onLang=onLang;
+function get(u,cb){fetch(u).then(function(r){return r.json()}).then(cb).catch(function(){})}
+function refresh(){get('/fallback/status',function(j){st=j;drawStatus()})}
+function load(){get('/fallback/config',function(j){cfg=j;drawRules()})}
+function pickText(){if(file){$('#dt').textContent=file.name;$('#ds').textContent=''}else{$('#dt').textContent=t('drop');$('#ds').textContent=t('or')}}
+function pick(f){file=f;pickText()}
+function up(){
+if(!file){setMsg(t('choose'),true);return}
+file.text().then(function(txt){
+return fetch('/fallback',{method:'POST',headers:{'Content-Type':'text/plain'},body:txt}).then(function(r){
+return r.text().then(function(m){setMsg(r.ok?m:t('fail')+m,!r.ok);if(r.ok){file=null;pickText();refresh();load()}})})
+}).catch(function(e){setMsg(t('fail')+e,true)})}
+function clr(){
+$('#dlg').close();
+fetch('/fallback',{method:'DELETE'}).then(function(r){return r.text()}).then(function(m){setMsg(m,false);refresh();load()})}
+var dz=$('#drop');
+$('#f').onchange=function(){pick(this.files[0]||null)};
+['dragenter','dragover'].forEach(function(n){dz.addEventListener(n,function(e){e.preventDefault();dz.classList.add('over')})});
+['dragleave','drop'].forEach(function(n){dz.addEventListener(n,function(e){e.preventDefault();dz.classList.remove('over')})});
+dz.addEventListener('drop',function(e){if(e.dataTransfer.files[0])pick(e.dataTransfer.files[0])});
+applyLang();refresh();load();setInterval(refresh,5000);
+</script></body></html>

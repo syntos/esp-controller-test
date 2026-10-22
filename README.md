@@ -214,10 +214,12 @@ Adapt the numbers to the inputs and outputs you actually wired.
 
 | Colour | Meaning |
 |---|---|
-| 🔴 Red | Starting up |
+| 🔴 Red | Starting up, or no connection to Home Assistant since power-up |
 | 🔵 Blue | Connected to Home Assistant |
-| 🟣 Purple | Connection to Home Assistant lost |
+| 🟣 Purple | Connection to Home Assistant lost (less than 15 seconds ago) |
 | 🟠 Orange | Home Assistant has been gone for 15 seconds: **fallback mode is active** |
+
+Only Home Assistant counts for the LED and for the fallback. Other connections to the controller, such as the log viewer in ESPHome Builder, do not change the colour.
 
 ---
 

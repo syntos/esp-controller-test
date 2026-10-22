@@ -1,4 +1,5 @@
 #include "fallback_engine.h"
+#include "pages.h"
 
 #include <cstring>
 
@@ -32,44 +33,7 @@ static const uint32_t RESET_WINDOW_MS = 60000;
 static const uint32_t BOOT_SETTLE_MS = 5000;  // initial input states are reported within this time
 static const uint32_t RESET_HOLD_MS = 10000;
 
-static const char *const SETUP_PAGE = R"HTML(<!doctype html><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Fallback setup</title>
-<body style="font-family:sans-serif;max-width:32rem;margin:2rem auto;padding:0 1rem">
-<h2>Set a password</h2>
-<p>Choose a password (at least 8 characters) for this page. User name: <b>admin</b>.</p>
-<p>The password travels unencrypted over your local network, so do not reuse a password from elsewhere.</p>
-<input type=password id=p minlength=8 autocomplete=new-password>
-<button onclick=go()>Save</button>
-<pre id=o></pre>
-<script>
-async function go(){
-let r=await fetch('/fallback/setup',{method:'POST',headers:{'Content-Type':'text/plain'},body:p.value});
-if(r.ok){location.reload()}else{o.textContent=await r.text()}}
-</script>)HTML";
-
-static const char *const PAGE = R"HTML(<!doctype html><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Fallback</title>
-<body style="font-family:sans-serif;max-width:32rem;margin:2rem auto;padding:0 1rem">
-<h2>Fallback configuration</h2>
-<p id=s>...</p>
-<input type=file id=f accept=".json,application/json">
-<button onclick=up()>Upload</button>
-<p><a href=/fallback/config download=fallback.json>Download current configuration</a></p>
-<button onclick=clr()>Clear configuration</button>
-<pre id=o></pre>
-<script>
-async function st(){let r=await fetch('/fallback/status');let j=await r.json();
-s.textContent='Mode: '+(j.active?'FALLBACK':'normal')+' | Home Assistant: '+(j.ha?'connected':'away')+' | rules: '+j.rules}
-async function up(){if(!f.files[0]){o.textContent='Choose a file first';return}
-let t=await f.files[0].text();
-let r=await fetch('/fallback',{method:'POST',headers:{'Content-Type':'text/plain'},body:t});
-o.textContent=await r.text();st()}
-async function clr(){if(!confirm('Clear the fallback configuration?'))return;
-let r=await fetch('/fallback',{method:'DELETE'});o.textContent=await r.text();st()}
-st()
-</script>)HTML";
+// The web pages (SETUP_PAGE, PAGE) are generated into pages.h by tools/build_device_pages.py.
 
 // ---------------------------------------------------------------- helpers
 
@@ -558,26 +522,26 @@ esp_err_t FallbackEngine::on_config_(httpd_req_t *req) {
 
 esp_err_t FallbackEngine::on_status_(httpd_req_t *req) {
   if (!this->check_auth_(req)) return ESP_OK;
-  bool ha = api::global_api_server != nullptr && api::global_api_server->is_connected();
+  bool ha = ha_connected_();
   size_t n;
   {
     std::lock_guard<std::mutex> lk(this->mutex_);
     n = this->rules_.size();
   }
-  char buf[96];
-  snprintf(buf, sizeof buf, "{\"active\":%s,\"ha\":%s,\"rules\":%u}", this->active_ ? "true" : "false",
-           ha ? "true" : "false", (unsigned) n);
-  return send_(req, "200 OK", "application/json", buf);
+  std::string out = "{\"active\":";
+  out += this->active_ ? "true" : "false";
+  out += ",\"ha\":";
+  out += ha ? "true" : "false";
+  out += ",\"rules\":" + std::to_string(n);
+  if (!this->editor_url_.empty()) out += ",\"editor\":\"" + this->editor_url_ + "\"";  // validated as a plain URL in __init__.py
+  out += "}";
+  return send_(req, "200 OK", "application/json", out);
 }
 
 // ---------------------------------------------------------------- reset LED feedback
 
 void FallbackEngine::reset_led_feedback_(bool on, float r, float g, float b) {
   if (this->status_light_ == nullptr) return;
-  if (!this->led_saved_) {
-    this->saved_led_ = this->status_light_->remote_values;
-    this->led_saved_ = true;
-  }
   auto call = this->status_light_->make_call();
   call.set_state(on);
   if (on) {
@@ -586,13 +550,34 @@ void FallbackEngine::reset_led_feedback_(bool on, float r, float g, float b) {
   }
   call.set_transition_length(0);
   call.perform();
+  this->led_applied_ = -1;  // the connection colour is re-applied afterwards
 }
 
 void FallbackEngine::reset_led_restore_() {
-  if (this->status_light_ == nullptr || !this->led_saved_) return;
-  this->led_saved_ = false;
+  this->led_applied_ = -1;  // update_led_() paints the current connection colour again
+}
+
+// Only a client that subscribed to states is Home Assistant. Other API clients, such as the
+// ESPHome Builder log viewer, must not count as "Home Assistant is connected".
+bool FallbackEngine::ha_connected_() {
+  return api::global_api_server != nullptr && api::global_api_server->is_connected_with_state_subscription();
+}
+
+void FallbackEngine::update_led_(bool ha_up) {
+  if (this->status_light_ == nullptr || this->reset_pressing_) return;
+  if (ha_up) this->seen_ha_ = true;
+  int want;
+  if (ha_up) want = 0;                  // blue
+  else if (this->active_) want = 1;     // orange: fallback mode
+  else if (this->seen_ha_) want = 2;    // purple: connection lost, waiting
+  else want = 3;                        // red: not connected since power-up
+  if (want == this->led_applied_) return;
+  this->led_applied_ = want;
+  static const float COLORS[4][3] = {{0.0f, 0.0f, 1.0f}, {1.0f, 0.4f, 0.0f}, {1.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}};
   auto call = this->status_light_->make_call();
-  call.from_light_color_values(this->saved_led_);
+  call.set_state(true);
+  call.set_rgb(COLORS[want][0], COLORS[want][1], COLORS[want][2]);
+  call.set_brightness(1.0f);
   call.set_transition_length(0);
   call.perform();
 }
@@ -624,7 +609,7 @@ void FallbackEngine::loop() {
 
 void FallbackEngine::update_mode_() {
   uint32_t now = millis();
-  bool ha_up = api::global_api_server != nullptr && api::global_api_server->is_connected();
+  bool ha_up = ha_connected_();
   if (ha_up != this->last_ha_up_) {
     this->last_ha_up_ = ha_up;
     this->last_change_ = now;
@@ -641,6 +626,7 @@ void FallbackEngine::update_mode_() {
     }
     ESP_LOGW(TAG, "Home Assistant back -> normal mode");
   }
+  this->update_led_(ha_up);
 }
 
 void FallbackEngine::on_input_(uint8_t idx, bool state) {

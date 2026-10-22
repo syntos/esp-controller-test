@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#4EC3E0">
+<title>Fallback – Logi.casa</title>
+<style>__CSS__</style></head>
+<body data-title="sTitle">
+__HEADER__
+<main class="wrap">
+<section class="intro"><h1 data-i="sTitle"></h1><p data-i="sIntro"></p></section>
+<section class="card">
+<label class="field" for="p" data-i="pw"></label>
+<input class="input" type="password" id="p" minlength="8" autocomplete="new-password" onkeydown="if(event.key==='Enter')go()">
+<div class="acts"><button class="btn primary" type="button" onclick="go()" data-i="save"></button></div>
+<div class="msg err" id="msg" hidden></div>
+<p class="note" data-i="sWarn"></p>
+</section>
+</main>
+<script>
+__LANGJS__
+function go(){
+var m=$('#msg'),v=$('#p').value;
+if(v.length<8){m.textContent=t('short');m.hidden=false;return}
+fetch('/fallback/setup',{method:'POST',headers:{'Content-Type':'text/plain'},body:v}).then(function(r){
+if(r.ok){location.reload();return}
+return r.text().then(function(x){m.textContent=x;m.hidden=false})})}
+applyLang();
+</script></body></html>

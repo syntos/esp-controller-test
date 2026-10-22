@@ -1,12 +1,13 @@
 # GENERATED FILE - do not edit by hand.
 # Source: src/common.yaml + src/network-wifi.yaml. Rebuild with: python tools/build_yaml.py
 #
-# Logi.casa ESP Home Controller, wifi variant, version 1.0.0.
+# Logi.casa ESP Home Controller, wifi variant, version 1.1.0.
 # Contains no private secrets. Your own API key is created when you take control in ESPHome Builder.
 
 substitutions:
-  project_version: "1.0.0"
+  project_version: "1.1.0"
   factory_api_key: "hLGjhf96voA4hxDAVuzz8/9QTL8kgiMh+las8DLf5L8="
+  editor_url: "https://syntos.github.io/esp-controller-test/"
   device_name: logicasa-wifi
   friendly_name: LogiCasa Controller
   prefix: esp
@@ -60,6 +61,7 @@ sensor:
     entity_category: diagnostic
 
 esphome:
+  min_version: 2026.9.0
   name: ${device_name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: true
@@ -87,35 +89,12 @@ logger:
 # controller in ESPHome Builder. That step generates your own private key.
 # reboot_timeout: 0s stops the controller from restarting when Home Assistant is away
 # for a long time, so the offline fallback keeps working.
+# The status LED colours (blue / purple / orange) are handled by the fallback_engine below,
+# which only counts Home Assistant as connected, not other API clients such as the log viewer.
 api:
   encryption:
     key: "${factory_api_key}"
   reboot_timeout: 0s
-  on_client_connected:
-    - light.turn_on:
-        id: statusled
-        green: 0.0
-        red: 0.0
-        blue: 1.0
-  on_client_disconnected:
-    # Purple: connection to Home Assistant lost
-    - light.turn_on:
-        id: statusled
-        green: 0.0
-        red: 1.0
-        blue: 1.0
-    # Orange: still gone after the fallback delay (= disconnect_delay, 15 s)
-    - delay: 15s
-    - if:
-        condition:
-          not:
-            api.connected:
-        then:
-          - light.turn_on:
-              id: statusled
-              green: 0.4
-              red: 1.0
-              blue: 0.0
 
 ota:
   - platform: esphome
@@ -1049,6 +1028,7 @@ fallback_engine:
   # fallback rules.
   reset_input: ${prefix}_INPUT_48
   status_light: statusled
+  editor_url: ${editor_url}
   inputs:
     - ${prefix}_INPUT_01
     - ${prefix}_INPUT_02

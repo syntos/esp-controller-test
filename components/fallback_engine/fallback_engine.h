@@ -40,6 +40,7 @@ class FallbackEngine : public Component {
   void set_disconnect_delay(uint32_t ms) { this->disconnect_delay_ = ms; }
   void set_reconnect_delay(uint32_t ms) { this->reconnect_delay_ = ms; }
   void set_port(uint16_t port) { this->port_ = port; }
+  void set_editor_url(const std::string &url) { this->editor_url_ = url; }
 
   // Clears only the password (rules are kept). Call from an ESPHome button:
   // lambda: id(fallback).reset_password();
@@ -100,6 +101,7 @@ class FallbackEngine : public Component {
   httpd_handle_t httpd_{nullptr};
   bool server_started_{false};
   uint16_t port_{80};
+  std::string editor_url_;
 
   // physical reset
   bool reset_seen_first_{false};
@@ -109,10 +111,15 @@ class FallbackEngine : public Component {
   uint32_t reset_blink_{0};
   bool reset_blink_on_{false};
   light::LightState *status_light_{nullptr};
-  light::LightColorValues saved_led_;
-  bool led_saved_{false};
   void reset_led_feedback_(bool on, float r, float g, float b);
   void reset_led_restore_();
+
+  // Status LED: blue = Home Assistant connected, purple = connection lost,
+  // orange = fallback mode active, red = no Home Assistant connection since power-up.
+  int led_applied_{-1};
+  bool seen_ha_{false};
+  void update_led_(bool ha_up);
+  static bool ha_connected_();
 
   uint32_t disconnect_delay_{15000};
   uint32_t reconnect_delay_{10000};

@@ -69,7 +69,8 @@ def generate(variant, cfg, local, out_dir):
     refresh = "1d" if re.match(r"^v?\d", ref) else "always"
 
     subs = ["  project_version: \"%s\"" % version,
-            "  factory_api_key: \"%s\"" % cfg["factory_api_key"]]
+            "  factory_api_key: \"%s\"" % cfg["factory_api_key"],
+            "  editor_url: \"https://%s.github.io/%s/\"" % tuple(cfg["repo"].split("/"))]
     subs += substitution_lines(network) + substitution_lines(common)
 
     if local:

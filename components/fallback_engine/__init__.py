@@ -16,6 +16,7 @@ CONF_DISCONNECT_DELAY = "disconnect_delay"
 CONF_RECONNECT_DELAY = "reconnect_delay"
 CONF_RESET_INPUT = "reset_input"
 CONF_STATUS_LIGHT = "status_light"
+CONF_EDITOR_URL = "editor_url"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -36,6 +37,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_RESET_INPUT): cv.use_id(binary_sensor.BinarySensor),
         # Optional: a light used to give feedback while the reset input is held
         cv.Optional(CONF_STATUS_LIGHT): cv.use_id(light.LightState),
+        # Optional: web address of the online fallback editor, shown as a button on the page
+        cv.Optional(CONF_EDITOR_URL): cv.All(cv.string, cv.Regex(r"^https?://[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$")),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -58,6 +61,9 @@ async def to_code(config):
     if CONF_STATUS_LIGHT in config:
         led = await cg.get_variable(config[CONF_STATUS_LIGHT])
         cg.add(var.set_status_light(led))
+
+    if CONF_EDITOR_URL in config:
+        cg.add(var.set_editor_url(config[CONF_EDITOR_URL]))
 
     cg.add(var.set_disconnect_delay(config[CONF_DISCONNECT_DELAY]))
     cg.add(var.set_reconnect_delay(config[CONF_RECONNECT_DELAY]))
