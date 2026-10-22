@@ -17,7 +17,6 @@ namespace fallback_engine {
 enum Trigger : uint8_t { TRG_BOTH = 0, TRG_RISING = 1, TRG_FALLING = 2 };
 enum Action : uint8_t { ACT_TOGGLE = 0, ACT_ON = 1, ACT_OFF = 2, ACT_ON_FOR = 3, ACT_OFF_FOR = 4 };
 
-// 6 bytes per regel in NVS
 struct Rule {
   uint8_t in;
   uint8_t out;
@@ -40,8 +39,6 @@ class FallbackEngine : public Component {
   void set_reconnect_delay(uint32_t ms) { this->reconnect_delay_ = ms; }
   void set_port(uint16_t port) { this->port_ = port; }
 
-  // Wist enkel het wachtwoord (de regels blijven bewaard). Aan te roepen vanuit een
-  // ESPHome-knop: lambda: id(fallback).reset_password();
   void reset_password();
 
  protected:
@@ -55,7 +52,6 @@ class FallbackEngine : public Component {
   bool parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err);
   std::string rules_to_json_();
 
-  // HTTP (draait in de eigen taak van esp_http_server -> gedeelde data via mutex_)
   void start_server_();
   bool check_auth_(httpd_req_t *req);
   esp_err_t on_page_(httpd_req_t *req);
@@ -67,20 +63,19 @@ class FallbackEngine : public Component {
 
   std::string get_password_();
 
-  // runtime (draait in de ESPHome-hoofdtaak)
   void update_mode_();
   void on_input_(uint8_t idx, bool state);
-  void run_action_(const Rule &r);  // mutex_ moet vastgehouden worden
+  void run_action_(const Rule &r);
   void process_timers_();
   bool get_out_(uint8_t o);
   void set_out_(uint8_t o, bool on);
   void start_timer_(uint8_t o, bool target, uint16_t seconds);
-  void cancel_timers_();  // mutex_ moet vastgehouden worden
+  void cancel_timers_();
 
   std::vector<binary_sensor::BinarySensor *> inputs_;
   std::vector<light::LightState *> outputs_;
 
-  std::mutex mutex_;  // beschermt rules_, timers en pass_
+  std::mutex mutex_;
   std::vector<Rule> rules_;
   std::vector<bool> timer_active_;
   std::vector<bool> timer_target_;
@@ -93,7 +88,6 @@ class FallbackEngine : public Component {
   bool server_started_{false};
   uint16_t port_{80};
 
-  // fysieke reset
   bool reset_seen_first_{false};
   bool reset_pressing_{false};
   uint32_t reset_press_start_{0};

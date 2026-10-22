@@ -24,8 +24,6 @@ static const size_t MAX_BODY = 32768;
 static const uint32_t DEBOUNCE_MS = 30;
 static const size_t PASS_MIN = 8, PASS_MAX = 64;
 
-// Fysieke reset: reset-ingang minstens RESET_HOLD_MS ingedrukt houden,
-// begonnen binnen RESET_WINDOW_MS na het opstarten.
 static const uint32_t RESET_WINDOW_MS = 60000;
 static const uint32_t RESET_HOLD_MS = 10000;
 
@@ -68,7 +66,7 @@ let r=await fetch('/fallback',{method:'DELETE'});o.textContent=await r.text();st
 st()
 </script>)HTML";
 
-// ---------------------------------------------------------------- hulpfuncties
+// ----------------------------------------------------------------
 
 static uint32_t fnv1a(const uint8_t *d, size_t n) {
   uint32_t h = 2166136261u;
@@ -132,14 +130,11 @@ static bool read_body_(httpd_req_t *req, std::string &out, size_t max) {
 void FallbackEngine::add_input(binary_sensor::BinarySensor *sensor) {
   uint8_t idx = this->inputs_.size();
   this->inputs_.push_back(sensor);
-  // sensor staat op inverted: state==true betekent "actief" (knop ingedrukt / schakelaar aan)
   sensor->add_on_state_callback([this, idx](bool state) { this->on_input_(idx, state); });
 }
 
 void FallbackEngine::set_reset_input(binary_sensor::BinarySensor *sensor) {
   sensor->add_on_state_callback([this](bool state) {
-    // De eerste callback is de initiele toestand na het opstarten: negeren.
-    // Alleen een echte druk (stijgende flank) binnen het tijdvenster telt.
     if (!this->reset_seen_first_) {
       this->reset_seen_first_ = true;
       return;
@@ -346,7 +341,7 @@ std::string FallbackEngine::rules_to_json_() {
 void FallbackEngine::start_server_() {
   httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
   cfg.server_port = this->port_;
-  cfg.ctrl_port = 32770;  // anders dan de standaard, voor het geval ESPHome's web_server ook draait
+  cfg.ctrl_port = 32770;
   cfg.max_uri_handlers = 12;
   cfg.stack_size = 10240;
   cfg.lru_purge_enable = true;
@@ -414,7 +409,7 @@ bool FallbackEngine::check_auth_(httpd_req_t *req) {
 
 esp_err_t FallbackEngine::on_page_(httpd_req_t *req) {
   if (this->get_password_().empty()) {
-    return send_(req, "200 OK", "text/html", SETUP_PAGE);  // eerste gebruik: wachtwoord kiezen
+    return send_(req, "200 OK", "text/html", SETUP_PAGE);
   }
   if (!this->check_auth_(req)) return ESP_OK;
   return send_(req, "200 OK", "text/html", PAGE);
@@ -504,7 +499,7 @@ esp_err_t FallbackEngine::on_status_(httpd_req_t *req) {
 
 void FallbackEngine::loop() {
   if (!this->server_started_ && network::is_connected()) {
-    this->server_started_ = true;  // eenmalige poging
+    this->server_started_ = true;
     this->start_server_();
   }
 
@@ -556,7 +551,7 @@ void FallbackEngine::on_input_(uint8_t idx, bool state) {
 void FallbackEngine::run_action_(const Rule &r) {
   if (r.out >= this->outputs_.size()) return;
   uint8_t o = r.out;
-  this->timer_active_[o] = false;  // elke nieuwe actie annuleert een lopende timer
+  this->timer_active_[o] = false;
   switch (r.action) {
     case ACT_TOGGLE:
       this->set_out_(o, !this->get_out_(o));
@@ -602,7 +597,6 @@ void FallbackEngine::cancel_timers_() {
 bool FallbackEngine::get_out_(uint8_t o) { return this->outputs_[o]->remote_values.is_on(); }
 
 void FallbackEngine::set_out_(uint8_t o, bool on) {
-  // via de light-entiteit, zodat de toestand correct naar HA gesynchroniseerd wordt bij reconnect
   auto call = this->outputs_[o]->make_call();
   call.set_state(on);
   call.set_transition_length(0);

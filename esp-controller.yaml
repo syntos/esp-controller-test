@@ -1,13 +1,7 @@
-# ESP-Controller (WT32-ETH01, 48 ingangen / 32 uitgangen) - publiek pakket.
-# Bevat GEEN geheimen: API-sleutel, OTA-wachtwoord en dergelijke komen in de
-# persoonlijke wrapper van de klant (zie example/klant-config.yaml) of worden
-# door het ESPHome-dashboard aangemaakt bij het adopteren.
-
 substitutions:
   device_name: logicasa
   friendly_name: LogiCasa Controller
   prefix: esp
-  # Waar deze repository staat (pas aan bij de definitieve repo)
   repo_user: syntos
   repo_name: esp-controller-test
 
@@ -32,8 +26,6 @@ esp32:
   framework:
     type: arduino
 
-# Klanten adopteren het apparaat in de ESPHome Device Builder. Het dashboard maakt dan
-# een kleine eigen config met een eigen API-sleutel en verwijst naar dit bestand.
 dashboard_import:
   package_import_url: github://${repo_user}/${repo_name}/esp-controller.yaml@main
   import_full_config: false
@@ -59,8 +51,6 @@ ethernet:
 logger:
   level: WARN
 
-# Geen encryptiesleutel hier: die staat in de wrapper van de klant.
-# reboot_timeout: 0s voorkomt dat de controller herstart als HA lang weg is.
 api:
   reboot_timeout: 0s
   on_client_connected:
@@ -72,10 +62,20 @@ api:
   on_client_disconnected:
     - light.turn_on:
         id: statusled
-        flash_length: 500ms
         green: 0.0
         red: 1.0
         blue: 1.0
+    - delay: 15s
+    - if:
+        condition:
+          not:
+            api.connected:
+        then:
+          - light.turn_on:
+              id: statusled
+              green: 0.4
+              red: 1.0
+              blue: 0.0
 
 ota:
   - platform: esphome
@@ -983,28 +983,29 @@ output:
       mode:
         output: true
 
-switch:
-  - platform: restart
-    id: "${prefix}_reboot"
-    name: "Reboot ${prefix}"
-
-# Knop in Home Assistant om het wachtwoord van de fallback-pagina te resetten
 button:
+  - platform: restart
+    id: ${prefix}_reboot
+    name: "Reboot ${prefix}"
+    entity_category: config
+  
   - platform: template
-    name: "Reset fallback-wachtwoord"
+    name: "Reset fallback-password"
     entity_category: config
     on_press:
       - lambda: id(fallback).reset_password();
 
-# Noodmodus. De volgorde van de lijsten bepaalt het nummer in het fallback-bestand:
-# inputs[0] = ${prefix}_INPUT_01 = "in": 0     outputs[0] = ch_01 = "out": 0
+  - platform: template
+    name: "Reset fallback-configuration"
+    entity_category: config
+    on_press:
+      - lambda: id(fallback).clear_rules();
+
 fallback_engine:
   id: fallback
   disconnect_delay: 15s
   reconnect_delay: 10s
-  # Optioneel: een DRUKKNOP-ingang om het wachtwoord fysiek te resetten
-  # (10 s ingedrukt houden binnen 60 s na het opstarten). Kies geen schakelaar.
-  # reset_input: ${prefix}_INPUT_48
+  reset_input: ${prefix}_INPUT_48
   inputs:
     - ${prefix}_INPUT_01
     - ${prefix}_INPUT_02

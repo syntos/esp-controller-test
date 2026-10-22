@@ -1,7 +1,3 @@
-# Persoonlijke config van de klant. Normaal maakt de ESPHome Device Builder dit
-# automatisch aan wanneer je het apparaat "adopteert" (met een eigen API-sleutel).
-# Handmatig kan het zo:
-
 substitutions:
   device_name: logicasa
 
@@ -16,8 +12,6 @@ api:
   encryption:
     key: !secret api_key
 
-# OTA-updates gebruiken dezelfde sleutel als de API (ESPHome 2026.9 of nieuwer).
-# Geen "password:" naast "encryption:" zetten, dat kan niet gecombineerd worden.
 ota:
   - platform: esphome
     encryption:
