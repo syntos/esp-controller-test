@@ -1,11 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
-#include <Preferences.h>
-#include <WebServer.h>
+#include <esp_http_server.h>
 
 #include "esphome/core/component.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -45,45 +45,53 @@ class FallbackEngine : public Component {
   void reset_password();
 
  protected:
-  // regels
+  // NVS
   void load_rules_();
-  void save_rules_();
+  bool save_rules_(const std::vector<Rule> &rules);
+  void load_password_();
+  bool save_password_(const std::string &pw);
+
+  // JSON
   bool parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err);
   std::string rules_to_json_();
 
-  // wachtwoord
-  void load_password_();
-  bool has_password_() const { return !this->pass_.empty(); }
-  void handle_setup_();
+  // HTTP (draait in de eigen taak van esp_http_server -> gedeelde data via mutex_)
+  void start_server_();
+  bool check_auth_(httpd_req_t *req);
+  esp_err_t on_page_(httpd_req_t *req);
+  esp_err_t on_setup_(httpd_req_t *req);
+  esp_err_t on_upload_(httpd_req_t *req);
+  esp_err_t on_delete_(httpd_req_t *req);
+  esp_err_t on_config_(httpd_req_t *req);
+  esp_err_t on_status_(httpd_req_t *req);
 
-  // webserver
-  void register_routes_();
-  bool auth_();
-  void handle_upload_();
+  std::string get_password_();
 
-  // runtime
+  // runtime (draait in de ESPHome-hoofdtaak)
   void update_mode_();
   void on_input_(uint8_t idx, bool state);
-  void run_action_(const Rule &r);
+  void run_action_(const Rule &r);  // mutex_ moet vastgehouden worden
   void process_timers_();
   bool get_out_(uint8_t o);
   void set_out_(uint8_t o, bool on);
   void start_timer_(uint8_t o, bool target, uint16_t seconds);
-  void cancel_timers_();
+  void cancel_timers_();  // mutex_ moet vastgehouden worden
 
   std::vector<binary_sensor::BinarySensor *> inputs_;
   std::vector<light::LightState *> outputs_;
-  std::vector<Rule> rules_;
 
-  std::vector<uint32_t> last_edge_;
+  std::mutex mutex_;  // beschermt rules_, timers en pass_
+  std::vector<Rule> rules_;
   std::vector<bool> timer_active_;
   std::vector<bool> timer_target_;
   std::vector<uint32_t> timer_end_;
+  std::string pass_;
 
-  std::unique_ptr<WebServer> server_;
+  std::vector<uint32_t> last_edge_;
+
+  httpd_handle_t httpd_{nullptr};
   bool server_started_{false};
   uint16_t port_{80};
-  std::string pass_;
 
   // fysieke reset
   bool reset_seen_first_{false};

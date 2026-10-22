@@ -1,9 +1,10 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor, light
+from esphome.components.esp32 import include_builtin_idf_component
 from esphome.const import CONF_ID, CONF_PORT
 
-DEPENDENCIES = ["network", "api"]
+DEPENDENCIES = ["network", "api", "esp32"]
 AUTO_LOAD = ["json"]
 
 fallback_ns = cg.esphome_ns.namespace("fallback_engine")
@@ -55,6 +56,5 @@ async def to_code(config):
     cg.add(var.set_reconnect_delay(config[CONF_RECONNECT_DELAY]))
     cg.add(var.set_port(config[CONF_PORT]))
 
-    # Arduino-ESP32 core libraries (framework: arduino)
-    cg.add_library("WebServer", None)
-    cg.add_library("Preferences", None)
+    # ESPHome sluit ongebruikte ESP-IDF-onderdelen uit; de HTTP-server hebben we nodig.
+    include_builtin_idf_component("esp_http_server")
