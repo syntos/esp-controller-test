@@ -17,6 +17,7 @@ namespace fallback_engine {
 enum Trigger : uint8_t { TRG_BOTH = 0, TRG_RISING = 1, TRG_FALLING = 2 };
 enum Action : uint8_t { ACT_TOGGLE = 0, ACT_ON = 1, ACT_OFF = 2, ACT_ON_FOR = 3, ACT_OFF_FOR = 4 };
 
+// 6 bytes per rule in NVS
 struct Rule {
   uint8_t in;
   uint8_t out;
@@ -39,7 +40,13 @@ class FallbackEngine : public Component {
   void set_reconnect_delay(uint32_t ms) { this->reconnect_delay_ = ms; }
   void set_port(uint16_t port) { this->port_ = port; }
 
+  // Clears only the password (rules are kept). Call from an ESPHome button:
+  // lambda: id(fallback).reset_password();
   void reset_password();
+
+  // Clears all fallback rules (password is kept). Call from an ESPHome button:
+  // lambda: id(fallback).clear_rules();
+  void clear_rules();
 
  protected:
   // NVS
@@ -52,6 +59,7 @@ class FallbackEngine : public Component {
   bool parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err);
   std::string rules_to_json_();
 
+  // HTTP (runs in esp_http_server's own task -> shared data protected by mutex_)
   void start_server_();
   bool check_auth_(httpd_req_t *req);
   esp_err_t on_page_(httpd_req_t *req);
@@ -63,19 +71,20 @@ class FallbackEngine : public Component {
 
   std::string get_password_();
 
+  // runtime (runs in the ESPHome main task)
   void update_mode_();
   void on_input_(uint8_t idx, bool state);
-  void run_action_(const Rule &r);
+  void run_action_(const Rule &r);  // mutex_ must be held
   void process_timers_();
   bool get_out_(uint8_t o);
   void set_out_(uint8_t o, bool on);
   void start_timer_(uint8_t o, bool target, uint16_t seconds);
-  void cancel_timers_();
+  void cancel_timers_();  // mutex_ must be held
 
   std::vector<binary_sensor::BinarySensor *> inputs_;
   std::vector<light::LightState *> outputs_;
 
-  std::mutex mutex_;
+  std::mutex mutex_;  // protects rules_, timers and pass_
   std::vector<Rule> rules_;
   std::vector<bool> timer_active_;
   std::vector<bool> timer_target_;
@@ -88,6 +97,7 @@ class FallbackEngine : public Component {
   bool server_started_{false};
   uint16_t port_{80};
 
+  // physical reset
   bool reset_seen_first_{false};
   bool reset_pressing_{false};
   uint32_t reset_press_start_{0};

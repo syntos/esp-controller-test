@@ -1,0 +1,23 @@
+# Personal customer config. Normally the ESPHome Device Builder creates this for you
+# when you "adopt" the device (with your own API key).
+# To do it by hand:
+
+substitutions:
+  device_name: logicasa
+
+packages:
+  logicasa:
+    url: https://github.com/syntos/esp-controller-test
+    ref: main
+    file: esp-controller.yaml
+    refresh: 1d
+
+api:
+  encryption:
+    key: !secret api_key
+
+# OTA updates use the same key as the API (ESPHome 2026.9 or newer).
+# Do not add "password:" next to "encryption:"; they cannot be combined.
+ota:
+  - platform: esphome
+    encryption:

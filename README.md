@@ -30,6 +30,7 @@
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
 - [Repository layout](#repository-layout)
+- [License](#license)
 - [Support](#support)
 
 ---
@@ -113,7 +114,7 @@ The rules are stored in the controller's own non-volatile memory, so they surviv
 2. Open `http://<controller-ip>/fallback` in a browser **on your local network**.
 3. The first time, the page asks you to **choose a password** (8 to 64 characters). Afterwards, log in with user name **`admin`** and that password.
 4. Choose your fallback file and click **Upload**. The controller checks the file and answers with the number of rules it saved, or with the reason it was rejected.
-5. Use **Download current configuration** to retrieve what is stored, and **Wipe configuration** to remove all rules.
+5. Use **Download current configuration** to retrieve what is stored, and **Clear configuration** to remove all rules.
 
 > The page and your password travel over plain HTTP inside your local network. Do not reuse a password from elsewhere.
 
@@ -148,7 +149,7 @@ A fallback file is a small JSON file. Every **rule** connects one **input** to o
 
 You can have **up to 256 rules**. One input may have several rules, so a single button can control several outputs.
 
-> A web-based editor for building this file is in development. Until then, copy and adapt the examples in this repository.
+> **Easiest way:** build the file visually with the [Fallback editor](https://syntos.github.io/esp-controller-test/). Pick inputs and outputs, test the rules in the built-in simulator, and download the file. You can also open an existing file to change it.
 
 ### Example
 
@@ -195,7 +196,7 @@ The controller adds a few configuration buttons to its device page in Home Assis
 |---|---|
 | **Reboot** | Restarts the controller |
 | **Reset fallback password** | Removes the fallback page password. You choose a new one the next time you open `/fallback`. Stored rules are kept. |
-| **Wipe fallback configuration** | Removes all stored fallback rules. The password is kept. |
+| **Clear fallback rules** | Removes all stored fallback rules. The password is kept. |
 
 ### Resetting the password without Home Assistant
 
@@ -253,16 +254,25 @@ connect the cable, flash with [ESPHome Web](https://web.esphome.io/) (Chrome or 
 ├── components/
 │   └── fallback_engine/           The fallback engine (ESPHome external component)
 ├── example/
-│   └── klant-config.yaml          Example configuration with your own secrets
+│   └── customer-config.yaml       Example configuration with your own secrets
+├── docs/
+│   └── index.html                 Fallback editor (served by GitHub Pages)
 ├── fallback-example.json          Small fallback example
 ├── fallback-test.json             Fallback example that covers every trigger and action
 ├── secrets.yaml.example           Template for your own secrets file
+├── LICENSE                        MIT license
 └── assets/
     └── logo.png
 ```
 
 `esp-controller.yaml` is the shared package. It deliberately contains **no secrets**. When you take control of a controller in ESPHome, it
 generates a small configuration of your own that points to this package and adds your own encryption key.
+
+---
+
+## License
+
+The code in this repository is released under the [MIT License](LICENSE). The Logi.casa name and logo are trademarks of Logi.casa and are not covered by that license.
 
 ---
 

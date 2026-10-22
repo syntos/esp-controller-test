@@ -19,6 +19,7 @@ CONF_RESET_INPUT = "reset_input"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(FallbackEngine),
+        # Order = index number in the fallback file (first = input/output 0)
         cv.Required(CONF_INPUTS): cv.All(
             cv.ensure_list(cv.use_id(binary_sensor.BinarySensor)),
             cv.Length(min=1, max=255),
@@ -30,6 +31,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_DISCONNECT_DELAY, default="15s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_RECONNECT_DELAY, default="10s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_PORT, default=80): cv.port,
+        # Optional: a push-button input the customer can use to reset the password
         cv.Optional(CONF_RESET_INPUT): cv.use_id(binary_sensor.BinarySensor),
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -54,4 +56,5 @@ async def to_code(config):
     cg.add(var.set_reconnect_delay(config[CONF_RECONNECT_DELAY]))
     cg.add(var.set_port(config[CONF_PORT]))
 
+    # ESPHome sluit ongebruikte ESP-IDF-onderdelen uit; de HTTP-server hebben we nodig.
     include_builtin_idf_component("esp_http_server")

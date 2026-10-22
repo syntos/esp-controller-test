@@ -1,7 +1,13 @@
+# Logi.casa ESP Home Controller (WT32-ETH01, 48 inputs / 32 outputs) - public package.
+# Contains NO secrets: API key, OTA password and the like live in the customer's
+# personal wrapper (see example/customer-config.yaml) or are created by the
+# ESPHome dashboard when the device is adopted.
+
 substitutions:
   device_name: logicasa
   friendly_name: LogiCasa Controller
   prefix: esp
+  # Where this repository lives (change to the final repo when you publish)
   repo_user: syntos
   repo_name: esp-controller-test
 
@@ -26,17 +32,19 @@ esp32:
   framework:
     type: arduino
 
+# Customers adopt the device in the ESPHome Device Builder. The dashboard then creates
+# a small personal config with its own API key that points to this file.
 dashboard_import:
   package_import_url: github://${repo_user}/${repo_name}/esp-controller.yaml@main
   import_full_config: false
 
 external_components:
-     - source:
-         type: git
-         url: https://github.com/${repo_user}/${repo_name}
-         ref: main
-       refresh: always
-       components: [fallback_engine]
+  - source:
+      type: git
+      url: https://github.com/${repo_user}/${repo_name}
+      ref: main
+    refresh: 1d
+    components: [fallback_engine]
 
 ethernet:
   type: LAN8720
@@ -51,6 +59,8 @@ ethernet:
 logger:
   level: WARN
 
+# Geen encryptiesleutel hier: die staat in de wrapper van de klant.
+# reboot_timeout: 0s voorkomt dat de controller herstart als HA lang weg is.
 api:
   reboot_timeout: 0s
   on_client_connected:
@@ -60,11 +70,13 @@ api:
         red: 0.0
         blue: 1.0
   on_client_disconnected:
+    # Paars: verbinding met Home Assistant weg
     - light.turn_on:
         id: statusled
         green: 0.0
         red: 1.0
         blue: 1.0
+    # Oranje: nog steeds weg na de wachttijd van de fallback (= disconnect_delay, 15 s)
     - delay: 15s
     - if:
         condition:
@@ -79,7 +91,6 @@ api:
 
 ota:
   - platform: esphome
-    encryption:
 
 i2c:
   sda: 32
@@ -985,27 +996,35 @@ output:
 
 button:
   - platform: restart
-    id: ${prefix}_reboot
+    id: "${prefix}_reboot"
     name: "Reboot ${prefix}"
     entity_category: config
-  
+  # Button in Home Assistant to reset the password of the fallback page
   - platform: template
-    name: "Reset fallback-password"
+    id: ${prefix}_reset_fallback_password
+    name: "Reset fallback password"
     entity_category: config
     on_press:
       - lambda: id(fallback).reset_password();
-
+  # Button in Home Assistant to erase all stored fallback rules
   - platform: template
-    name: "Reset fallback-configuration"
+    id: ${prefix}_clear_fallback_rules
+    name: "Clear fallback rules"
     entity_category: config
     on_press:
       - lambda: id(fallback).clear_rules();
 
+# Offline fallback. The order of the lists determines the number used in the fallback file:
+# inputs[0] = ${prefix}_INPUT_01 = "in": 0     outputs[0] = ch_01 = "out": 0
 fallback_engine:
   id: fallback
   disconnect_delay: 15s
   reconnect_delay: 10s
-  reset_input: ${prefix}_INPUT_48
+  # Optional: a PUSH-BUTTON input to reset the fallback page password without Home
+  # Assistant. Press it within 60 s after power-up and hold for 10 s. The first
+  # state seen after boot is ignored, so a button that is already held down at
+  # power-up does not trigger it. Pick a push button, not a wall switch.
+  # reset_input: ${prefix}_INPUT_48
   inputs:
     - ${prefix}_INPUT_01
     - ${prefix}_INPUT_02

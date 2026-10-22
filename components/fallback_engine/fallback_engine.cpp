@@ -24,18 +24,20 @@ static const size_t MAX_BODY = 32768;
 static const uint32_t DEBOUNCE_MS = 30;
 static const size_t PASS_MIN = 8, PASS_MAX = 64;
 
+// Physical reset: hold the reset input for at least RESET_HOLD_MS,
+// starting within RESET_WINDOW_MS after boot.
 static const uint32_t RESET_WINDOW_MS = 60000;
 static const uint32_t RESET_HOLD_MS = 10000;
 
 static const char *const SETUP_PAGE = R"HTML(<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>Fallback instellen</title>
+<title>Fallback setup</title>
 <body style="font-family:sans-serif;max-width:32rem;margin:2rem auto;padding:0 1rem">
-<h2>Wachtwoord instellen</h2>
-<p>Kies een wachtwoord (minstens 8 tekens) voor deze pagina. Gebruikersnaam: <b>admin</b>.</p>
-<p>Het wachtwoord reist onversleuteld over je lokale netwerk. Hergebruik dus geen wachtwoord van elders.</p>
+<h2>Set a password</h2>
+<p>Choose a password (at least 8 characters) for this page. User name: <b>admin</b>.</p>
+<p>The password travels unencrypted over your local network, so do not reuse a password from elsewhere.</p>
 <input type=password id=p minlength=8 autocomplete=new-password>
-<button onclick=go()>Opslaan</button>
+<button onclick=go()>Save</button>
 <pre id=o></pre>
 <script>
 async function go(){
@@ -47,26 +49,26 @@ static const char *const PAGE = R"HTML(<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Fallback</title>
 <body style="font-family:sans-serif;max-width:32rem;margin:2rem auto;padding:0 1rem">
-<h2>Fallback-configuratie</h2>
+<h2>Fallback configuration</h2>
 <p id=s>...</p>
 <input type=file id=f accept=".json,application/json">
 <button onclick=up()>Upload</button>
-<p><a href=/fallback/config download=fallback.json>Huidige configuratie downloaden</a></p>
-<button onclick=clr()>Configuratie wissen</button>
+<p><a href=/fallback/config download=fallback.json>Download current configuration</a></p>
+<button onclick=clr()>Clear configuration</button>
 <pre id=o></pre>
 <script>
 async function st(){let r=await fetch('/fallback/status');let j=await r.json();
-s.textContent='Modus: '+(j.active?'FALLBACK':'normaal')+' | Home Assistant: '+(j.ha?'verbonden':'weg')+' | regels: '+j.rules}
-async function up(){if(!f.files[0]){o.textContent='Kies eerst een bestand';return}
+s.textContent='Mode: '+(j.active?'FALLBACK':'normal')+' | Home Assistant: '+(j.ha?'connected':'away')+' | rules: '+j.rules}
+async function up(){if(!f.files[0]){o.textContent='Choose a file first';return}
 let t=await f.files[0].text();
 let r=await fetch('/fallback',{method:'POST',headers:{'Content-Type':'text/plain'},body:t});
 o.textContent=await r.text();st()}
-async function clr(){if(!confirm('Fallback-configuratie wissen?'))return;
+async function clr(){if(!confirm('Clear the fallback configuration?'))return;
 let r=await fetch('/fallback',{method:'DELETE'});o.textContent=await r.text();st()}
 st()
 </script>)HTML";
 
-// ----------------------------------------------------------------
+// ---------------------------------------------------------------- helpers
 
 static uint32_t fnv1a(const uint8_t *d, size_t n) {
   uint32_t h = 2166136261u;
@@ -130,11 +132,14 @@ static bool read_body_(httpd_req_t *req, std::string &out, size_t max) {
 void FallbackEngine::add_input(binary_sensor::BinarySensor *sensor) {
   uint8_t idx = this->inputs_.size();
   this->inputs_.push_back(sensor);
+  // sensor is inverted: state==true means "active" (button pressed / switch on)
   sensor->add_on_state_callback([this, idx](bool state) { this->on_input_(idx, state); });
 }
 
 void FallbackEngine::set_reset_input(binary_sensor::BinarySensor *sensor) {
   sensor->add_on_state_callback([this](bool state) {
+    // The first callback is the initial state after boot: ignore it.
+    // Only a real press (rising edge) within the time window counts.
     if (!this->reset_seen_first_) {
       this->reset_seen_first_ = true;
       return;
@@ -172,7 +177,7 @@ void FallbackEngine::dump_config() {
 void FallbackEngine::load_rules_() {
   nvs_handle_t h;
   if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
-    ESP_LOGW(TAG, "NVS namespace kon niet geopend worden");
+    ESP_LOGW(TAG, "Could not open NVS namespace");
     return;
   }
   uint16_t n = 0;
@@ -190,11 +195,11 @@ void FallbackEngine::load_rules_() {
   nvs_close(h);
 
   if (e != ESP_OK || len != bytes || fnv1a((const uint8_t *) tmp.data(), bytes) != hash) {
-    ESP_LOGE(TAG, "Fallback-config in NVS is beschadigd, genegeerd");
+    ESP_LOGE(TAG, "Fallback config in NVS is corrupt, ignored");
     return;
   }
   this->rules_ = std::move(tmp);
-  ESP_LOGI(TAG, "%u fallback-regels geladen", (unsigned) this->rules_.size());
+  ESP_LOGI(TAG, "%u fallback rules loaded", (unsigned) this->rules_.size());
 }
 
 bool FallbackEngine::save_rules_(const std::vector<Rule> &rules) {
@@ -255,25 +260,36 @@ void FallbackEngine::reset_password() {
     std::lock_guard<std::mutex> lk(this->mutex_);
     this->pass_.clear();
   }
-  ESP_LOGW(TAG, "Wachtwoord gewist: stel een nieuw wachtwoord in via /fallback");
+  ESP_LOGW(TAG, "Password cleared: set a new password via /fallback");
+}
+
+void FallbackEngine::clear_rules() {
+  std::vector<Rule> empty;
+  this->save_rules_(empty);
+  {
+    std::lock_guard<std::mutex> lk(this->mutex_);
+    this->rules_.clear();
+    this->cancel_timers_();
+  }
+  ESP_LOGW(TAG, "Fallback rules cleared");
 }
 
 // ---------------------------------------------------------------- JSON
 
 bool FallbackEngine::parse_config_(const std::string &body, std::vector<Rule> &out, std::string &err) {
-  err = "ongeldige JSON";
+  err = "invalid JSON";
   bool ok = json::parse_json(body, [&](JsonObject root) -> bool {
     if ((int) (root["version"] | 0) != 1) {
-      err = "version moet 1 zijn";
+      err = "version must be 1";
       return false;
     }
     JsonArray arr = root["rules"].as<JsonArray>();
     if (arr.isNull()) {
-      err = "'rules' ontbreekt";
+      err = "'rules' is missing";
       return false;
     }
     if (arr.size() > MAX_RULES) {
-      err = "te veel regels";
+      err = "too many rules";
       return false;
     }
     size_t line = 0;
@@ -288,22 +304,22 @@ bool FallbackEngine::parse_config_(const std::string &body, std::vector<Rule> &o
       int ai = find_name(ACTION_NAMES, 5, a);
       char buf[48];
       if (in < 0 || in >= (int) this->inputs_.size()) {
-        snprintf(buf, sizeof buf, "regel %u: ongeldige ingang", (unsigned) line);
+        snprintf(buf, sizeof buf, "rule %u: invalid input", (unsigned) line);
         err = buf;
         return false;
       }
       if (o < 0 || o >= (int) this->outputs_.size()) {
-        snprintf(buf, sizeof buf, "regel %u: ongeldige uitgang", (unsigned) line);
+        snprintf(buf, sizeof buf, "rule %u: invalid output", (unsigned) line);
         err = buf;
         return false;
       }
       if (ti < 0 || ai < 0) {
-        snprintf(buf, sizeof buf, "regel %u: ongeldige trigger/actie", (unsigned) line);
+        snprintf(buf, sizeof buf, "rule %u: invalid trigger/action", (unsigned) line);
         err = buf;
         return false;
       }
       if ((ai == ACT_ON_FOR || ai == ACT_OFF_FOR) && (sec < 1 || sec > 65535)) {
-        snprintf(buf, sizeof buf, "regel %u: seconds 1-65535", (unsigned) line);
+        snprintf(buf, sizeof buf, "rule %u: seconds must be 1-65535", (unsigned) line);
         err = buf;
         return false;
       }
@@ -341,13 +357,13 @@ std::string FallbackEngine::rules_to_json_() {
 void FallbackEngine::start_server_() {
   httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
   cfg.server_port = this->port_;
-  cfg.ctrl_port = 32770;
+  cfg.ctrl_port = 32770;  // differs from the default, in case ESPHome's web_server also runs
   cfg.max_uri_handlers = 12;
   cfg.stack_size = 10240;
   cfg.lru_purge_enable = true;
 
   if (httpd_start(&this->httpd_, &cfg) != ESP_OK) {
-    ESP_LOGE(TAG, "HTTP-server starten mislukt (poort %u in gebruik?)", this->port_);
+    ESP_LOGE(TAG, "Failed to start HTTP server (port %u in use?)", this->port_);
     this->httpd_ = nullptr;
     return;
   }
@@ -380,13 +396,13 @@ void FallbackEngine::start_server_() {
     return static_cast<FallbackEngine *>(r->user_ctx)->on_status_(r);
   });
 
-  ESP_LOGI(TAG, "Upload-pagina actief op /fallback (poort %u)", this->port_);
+  ESP_LOGI(TAG, "Upload page active at /fallback (port %u)", this->port_);
 }
 
 bool FallbackEngine::check_auth_(httpd_req_t *req) {
   std::string pw = this->get_password_();
   if (pw.empty()) {
-    send_(req, "403 Forbidden", "text/plain", "Stel eerst een wachtwoord in via /fallback");
+    send_(req, "403 Forbidden", "text/plain", "Set a password first via /fallback");
     return false;
   }
   size_t hl = httpd_req_get_hdr_value_len(req, "Authorization");
@@ -403,13 +419,13 @@ bool FallbackEngine::check_auth_(httpd_req_t *req) {
   httpd_resp_set_status(req, "401 Unauthorized");
   httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Fallback\"");
   httpd_resp_set_type(req, "text/plain");
-  httpd_resp_send(req, "Login vereist", HTTPD_RESP_USE_STRLEN);
+  httpd_resp_send(req, "Login required", HTTPD_RESP_USE_STRLEN);
   return false;
 }
 
 esp_err_t FallbackEngine::on_page_(httpd_req_t *req) {
   if (this->get_password_().empty()) {
-    return send_(req, "200 OK", "text/html", SETUP_PAGE);
+    return send_(req, "200 OK", "text/html", SETUP_PAGE);  // first use: choose a password
   }
   if (!this->check_auth_(req)) return ESP_OK;
   return send_(req, "200 OK", "text/html", PAGE);
@@ -417,25 +433,25 @@ esp_err_t FallbackEngine::on_page_(httpd_req_t *req) {
 
 esp_err_t FallbackEngine::on_setup_(httpd_req_t *req) {
   if (!this->get_password_().empty()) {
-    return send_(req, "403 Forbidden", "text/plain", "Wachtwoord is al ingesteld");
+    return send_(req, "403 Forbidden", "text/plain", "Password is already set");
   }
   std::string body;
   if (!read_body_(req, body, 256) || body.size() < PASS_MIN || body.size() > PASS_MAX) {
-    return send_(req, "400 Bad Request", "text/plain", "Het wachtwoord moet 8 tot 64 tekens lang zijn");
+    return send_(req, "400 Bad Request", "text/plain", "The password must be 8 to 64 characters long");
   }
   for (unsigned char c : body) {
     if (c < 0x20 || c == 0x7f) {
-      return send_(req, "400 Bad Request", "text/plain", "Ongeldige tekens in wachtwoord");
+      return send_(req, "400 Bad Request", "text/plain", "Invalid characters in password");
     }
   }
   if (!this->save_password_(body)) {
-    return send_(req, "500 Internal Server Error", "text/plain", "Opslaan mislukt");
+    return send_(req, "500 Internal Server Error", "text/plain", "Saving failed");
   }
   {
     std::lock_guard<std::mutex> lk(this->mutex_);
     this->pass_ = body;
   }
-  ESP_LOGI(TAG, "Wachtwoord ingesteld");
+  ESP_LOGI(TAG, "Password set");
   return send_(req, "200 OK", "text/plain", "OK");
 }
 
@@ -443,15 +459,15 @@ esp_err_t FallbackEngine::on_upload_(httpd_req_t *req) {
   if (!this->check_auth_(req)) return ESP_OK;
   std::string body;
   if (!read_body_(req, body, MAX_BODY)) {
-    return send_(req, "400 Bad Request", "text/plain", "Lege of te grote upload");
+    return send_(req, "400 Bad Request", "text/plain", "Empty or too large upload");
   }
   std::vector<Rule> parsed;
   std::string err;
   if (!this->parse_config_(body, parsed, err)) {
-    return send_(req, "400 Bad Request", "text/plain", "Afgekeurd: " + err);
+    return send_(req, "400 Bad Request", "text/plain", "Rejected: " + err);
   }
   if (!this->save_rules_(parsed)) {
-    return send_(req, "500 Internal Server Error", "text/plain", "Opslaan in NVS mislukt");
+    return send_(req, "500 Internal Server Error", "text/plain", "Saving to NVS failed");
   }
   {
     std::lock_guard<std::mutex> lk(this->mutex_);
@@ -459,21 +475,15 @@ esp_err_t FallbackEngine::on_upload_(httpd_req_t *req) {
     this->cancel_timers_();
   }
   char buf[64];
-  snprintf(buf, sizeof buf, "OK: %u regels opgeslagen", (unsigned) parsed.size());
+  snprintf(buf, sizeof buf, "OK: %u rules saved", (unsigned) parsed.size());
   ESP_LOGI(TAG, "%s", buf);
   return send_(req, "200 OK", "text/plain", buf);
 }
 
 esp_err_t FallbackEngine::on_delete_(httpd_req_t *req) {
   if (!this->check_auth_(req)) return ESP_OK;
-  std::vector<Rule> empty;
-  this->save_rules_(empty);
-  {
-    std::lock_guard<std::mutex> lk(this->mutex_);
-    this->rules_.clear();
-    this->cancel_timers_();
-  }
-  return send_(req, "200 OK", "text/plain", "Configuratie gewist");
+  this->clear_rules();
+  return send_(req, "200 OK", "text/plain", "Configuration cleared");
 }
 
 esp_err_t FallbackEngine::on_config_(httpd_req_t *req) {
@@ -499,7 +509,7 @@ esp_err_t FallbackEngine::on_status_(httpd_req_t *req) {
 
 void FallbackEngine::loop() {
   if (!this->server_started_ && network::is_connected()) {
-    this->server_started_ = true;
+    this->server_started_ = true;  // single attempt
     this->start_server_();
   }
 
@@ -522,14 +532,14 @@ void FallbackEngine::update_mode_() {
   uint32_t stable = now - this->last_change_;
   if (!this->active_ && !ha_up && stable >= this->disconnect_delay_) {
     this->active_ = true;
-    ESP_LOGW(TAG, "Home Assistant weg -> FALLBACK actief (%u regels)", (unsigned) this->rules_.size());
+    ESP_LOGW(TAG, "Home Assistant gone -> FALLBACK active (%u rules)", (unsigned) this->rules_.size());
   } else if (this->active_ && ha_up && stable >= this->reconnect_delay_) {
     this->active_ = false;
     {
       std::lock_guard<std::mutex> lk(this->mutex_);
       this->cancel_timers_();
     }
-    ESP_LOGW(TAG, "Home Assistant terug -> normale modus");
+    ESP_LOGW(TAG, "Home Assistant back -> normal mode");
   }
 }
 
@@ -551,7 +561,7 @@ void FallbackEngine::on_input_(uint8_t idx, bool state) {
 void FallbackEngine::run_action_(const Rule &r) {
   if (r.out >= this->outputs_.size()) return;
   uint8_t o = r.out;
-  this->timer_active_[o] = false;
+  this->timer_active_[o] = false;  // every new action cancels a running timer
   switch (r.action) {
     case ACT_TOGGLE:
       this->set_out_(o, !this->get_out_(o));
@@ -597,6 +607,7 @@ void FallbackEngine::cancel_timers_() {
 bool FallbackEngine::get_out_(uint8_t o) { return this->outputs_[o]->remote_values.is_on(); }
 
 void FallbackEngine::set_out_(uint8_t o, bool on) {
+  // via the light entity, so the state syncs correctly to HA on reconnect
   auto call = this->outputs_[o]->make_call();
   call.set_state(on);
   call.set_transition_length(0);
